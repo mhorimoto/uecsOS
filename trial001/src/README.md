@@ -14,3 +14,10 @@ Test Message
 --- Execution Finished ---
 ```
 と表示されます．
+
+### LED ON/OFFのテスト
+```bash
+echo -e "LED(1)\nprint \"LED ON\n\"" | nc -u -w1 192.168.38.106 8888
+echo -e "LED(0)\nprint \"LED OFF\n\"" | nc -u -w1 192.168.38.106 8888
+```
+これはまだデバッグ中
