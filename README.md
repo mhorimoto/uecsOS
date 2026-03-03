@@ -4,6 +4,8 @@
 * 目的: 農業情報標準規格「UECS（Ubiquitous Environment Control System）」に準拠し，エンドユーザー（農家）が自ら制御ロジックを構築できる「ノーコード環境制御システム」の構築．
 * 基本コンセプト: 堅牢な「C++ OS層」と柔軟な「スクリプト・ロジック層」の分離．
 
+![コンセプトイメージ](uecsOS_Design_Concept_of_Next-Generation_Control_Node_for_SmartAgriculture.png)
+
 ## 2. ハードウェア・スタック
 * コアマイコン: Teensy 4.1 (Cortex-M7, 600MHz, RAM 1MB, Flash 8MB)．
 * ネットワーク: Native Ethernet (i.MX RT1062内蔵PHY) を使用．
