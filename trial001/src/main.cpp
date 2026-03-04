@@ -69,13 +69,13 @@ void execute_basic_code(const char* code) {
     if (mb) {
         mb_close(&mb); // 以前の状態をクリア
         mb = NULL;
-        mb_dispose(); // メモリプールを完全に解放
     }
-    mb_init(); // 実行のたびに初期化
     if (mb_open(&mb) != MB_FUNC_OK) {
         Serial.println("Failed to open MY-BASIC instance.");
         return;
     }
+    mb_set_limit(mb, 0, 64); // MB_LIMIT_MAX_EXP_COUNT 相当
+    mb_set_limit(mb, 1, 32); // MB_LIMIT_MAX_VAR_COUNT 相当
     mb_set_printer(mb, _print_handler);
     mb_set_error_handler(mb, _on_error);
 
@@ -101,7 +101,7 @@ void setup() {
     Serial.println("========================================");
     Serial.println("UECS-OS on Teensy 4.1 : System Starting");
     Serial.println("Version: 0.1.0  PRINT");
-    Serial.println("Version: 0.2.0  RESET");
+    Serial.println("Version: 0.2.3  RESET,LED");
     Serial.println("Copyright (c) 2026 uecsOS Team");
     Serial.println("========================================");
 
