@@ -9,13 +9,15 @@ extern "C" {
     #include "my_basic.h"
 }
 
+#define MY_UDP_BUFFER_SIZE 1460
+
 // Ethernet設定
 byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
 unsigned int localPort = 8888;  // GUIからの送信ポート
 
 EthernetUDP Udp;
 struct mb_interpreter_t* mb = NULL;
-char packetBuffer[UDP_TX_PACKET_MAX_SIZE]; // 受信バッファ
+char packetBuffer[MY_UDP_BUFFER_SIZE]; // 受信バッファ
 
 // MY-BASIC エラーハンドラ
 void _on_error(struct mb_interpreter_t* s, mb_error_e e, const char* m, const char* f, int p, unsigned short row, unsigned short col, int a) {
@@ -31,6 +33,20 @@ int _print_handler(struct mb_interpreter_t* s, const char* fmt, ...) {
     va_end(arg);
     Serial.print(buf);
     return MB_FUNC_OK;
+}
+
+// ソフトウェアリセットを実行する関数
+void teensy_reset() {
+  // ARM Cortex-M7 システムリセット
+  SCB_AIRCR = 0x05FA0004;
+}
+
+// BASICから REBOOT() と呼び出した時に実行されるハンドラ
+int _user_reboot(struct mb_interpreter_t* s, void** l) {
+    Serial.println("System Rebooting...");
+    delay(100); // ログを出し切るための待機
+    teensy_reset();
+    return MB_FUNC_OK; // 実際にはここには到達しません
 }
 
 // BASICから LED(1) や LED(0) と呼び出した時に実行される関数
@@ -53,7 +69,9 @@ void execute_basic_code(const char* code) {
     if (mb) {
         mb_close(&mb); // 以前の状態をクリア
         mb = NULL;
+        mb_dispose(); // メモリプールを完全に解放
     }
+    mb_init(); // 実行のたびに初期化
     if (mb_open(&mb) != MB_FUNC_OK) {
         Serial.println("Failed to open MY-BASIC instance.");
         return;
@@ -62,6 +80,7 @@ void execute_basic_code(const char* code) {
     mb_set_error_handler(mb, _on_error);
 
     // ここでOS層の自作関数（GET_UECS_TEMP等）を再登録する
+    mb_register_func(mb, "REBOOT", _user_reboot);
     mb_register_func(mb, "LED", _user_led_control);
     // register_uecs_functions(mb); 
 
@@ -81,6 +100,9 @@ void setup() {
 
     Serial.println("========================================");
     Serial.println("UECS-OS on Teensy 4.1 : System Starting");
+    Serial.println("Version: 0.1.0  PRINT");
+    Serial.println("Version: 0.2.0  RESET");
+    Serial.println("Copyright (c) 2026 uecsOS Team");
     Serial.println("========================================");
 
     // MY-BASIC初期化
@@ -111,7 +133,8 @@ void setup() {
 void loop() {
     int packetSize = Udp.parsePacket();
     if (packetSize) {
-        int len = Udp.read(packetBuffer, UDP_TX_PACKET_MAX_SIZE - 1);
+        memset(packetBuffer, 0, MY_UDP_BUFFER_SIZE);
+        int len = Udp.read(packetBuffer, MY_UDP_BUFFER_SIZE - 1);
         if (len > 0) {
             packetBuffer[len] = '\0'; // 文字列終端
             Serial.println("Received new logic via UDP.");
