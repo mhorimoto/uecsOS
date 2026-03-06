@@ -35,7 +35,7 @@ void setup() {
 
     Serial.println("========================================");
     Serial.println("uecsOS on Teensy 4.1 : System Starting");
-    Serial.println("Version: 0.3.0 - Lua 5.5 Integration");
+    Serial.println("Version: 2.0.0 - Lua 5.5 Integration");
     Serial.println("Copyright (c) 2026 uecsOS Team");
     Serial.println("========================================");
 
@@ -63,34 +63,33 @@ void setup() {
     } else {
         Serial.println("SD Card initialized.");
     }
+    // --- 起動時の自動実行セクション ---
+    if (SD.exists("startup.lua")) {
+        Serial.println("Found startup.lua. Executing...");
+        
+        lua_State *L = luaL_newstate();
+        luaL_openlibs(L);
+        register_lua_functions(L);
 
-    // 1. Luaの状態（ステート）を初期化
-    lua_State *L = luaL_newstate();
-    // 2. 標準ライブラリ（print関数など）をロード
-    luaL_openlibs(L);
-    register_lua_functions(L); // 共通関数で一括登録
-    // 3. 実行したいLuaスクリプト
-    //const char* lua_script = "print('Hello from Lua 5.5 on Teensy!')";
-    const char* lua_script = 
-        "print('LED Blink Start from Lua...') "
-        "for i=1, 5 do "
-        "  digitalWrite(13, 1) "
-        "  delay(200) "
-        "  digitalWrite(13, 0) "
-        "  delay(200) "
-        "  print('Blink count: ' .. i) "
-        "end "
-        "print('LED Blink Finished!') ";
-    // 4. スクリプトの実行
-    if (luaL_dostring(L, lua_script) != LUA_OK) {
-        // エラーがあればシリアルに出力
-        Serial.println(lua_tostring(L, -1));
+        // C++からIPアドレスをLua変数 "my_ip" として渡す
+        IPAddress ip = Ethernet.localIP();
+        String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
+        lua_pushstring(L, ipStr.c_str());
+        lua_setglobal(L, "my_ip");
+
+        // SDカードから読み込んで実行
+        File f = SD.open("startup.lua");
+        if (f) {
+            String script = "";
+            while (f.available()) script += (char)f.read();
+            f.close();
+            if (luaL_dostring(L, script.c_str()) != LUA_OK) {
+                Serial.printf("Startup Error: %s\n", lua_tostring(L, -1));
+            }
+        }
+        lua_close(L); // 一旦クローズしてメモリを解放
     }
-
-    // 5. ステートのクローズ
-    lua_close(L);
-  
-    Serial.println("--- Execution Finished ---");
+    Serial.println("--- System Ready: Waiting for UDP Commands ---");
 }
 
 void loop() {
@@ -110,6 +109,12 @@ void loop() {
                 lua_State *L = luaL_newstate();
                 luaL_openlibs(L);
                 register_lua_functions(L);
+
+                // UDPでも "my_ip" が使えるように再登録
+                IPAddress ip = Ethernet.localIP();
+                String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
+                lua_pushstring(L, ipStr.c_str());
+                lua_setglobal(L, "my_ip");
 
                 // 蓄積したバッファを実行
                 if (luaL_dostring(L, luaBuffer.c_str()) != LUA_OK) {
