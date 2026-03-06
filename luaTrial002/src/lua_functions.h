@@ -6,6 +6,7 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <USBHost_t36.h>
 
 extern "C" {
     #include "lua/lua.h"
@@ -15,6 +16,9 @@ extern "C" {
 
 // 共有インスタンスの外部参照宣言
 extern LiquidCrystal_I2C lcd;
+extern USBHost myusb;
+extern USBSerial_BigBuffer userial;
+
 
 // 関数登録用メイン関数
 void register_lua_functions(lua_State *L);
@@ -40,5 +44,10 @@ int l_lcd_setCursor(lua_State *L);
 int l_i2c_begin(lua_State *L);
 int l_i2c_read(lua_State *L);
 int l_i2c_write(lua_State *L);
+
+// USB系
+int l_usb_begin(lua_State *L);
+int l_usb_write(lua_State *L);
+int l_usb_read(lua_State *L);
 
 #endif

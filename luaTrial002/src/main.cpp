@@ -24,6 +24,43 @@ char packetBuffer[MY_UDP_BUFFER_SIZE]; // 受信バッファ
 std::string luaBuffer = ""; // 受信したコードを溜めるバッファ
 bool processingCode = false;
 
+/**
+ * SDカード内のLuaファイルを読み込んで実行するExecuter
+ * @param filename 実行したいファイル名（例: "task1.lua"）
+ */
+void execute_lua_file(const char* filename) {
+    if (!SD.exists(filename)) {
+        Serial.printf("Executer Error: File '%s' not found.\n", filename);
+        return;
+    }
+
+    Serial.printf("--- Executing File: %s ---\n", filename);
+    
+    lua_State *L = luaL_newstate();
+    luaL_openlibs(L);
+    register_lua_functions(L); // ハードウェア制御関数の登録
+
+    // C++からIPアドレスなどのシステム変数を渡す
+    IPAddress ip = Ethernet.localIP();
+    String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
+    lua_pushstring(L, ipStr.c_str());
+    lua_setglobal(L, "my_ip");
+
+    File f = SD.open(filename);
+    if (f) {
+        String script = "";
+        while (f.available()) script += (char)f.read();
+        f.close(); // 読み終えたら即座に閉じる
+
+        if (luaL_dostring(L, script.c_str()) != LUA_OK) {
+            Serial.printf("Lua Runtime Error in %s: %s\n", filename, lua_tostring(L, -1));
+        }
+    }
+    
+    lua_close(L);
+    Serial.println("--- Execution Finished ---");
+}
+
 
 void setup() {
     Serial.begin(115200);
@@ -35,7 +72,7 @@ void setup() {
 
     Serial.println("========================================");
     Serial.println("uecsOS on Teensy 4.1 : System Starting");
-    Serial.println("Version: 2.0.0 - Lua 5.5 Integration");
+    Serial.println("Version: 2.1.0 - Lua 5.5 Integration");
     Serial.println("Copyright (c) 2026 uecsOS Team");
     Serial.println("========================================");
 
@@ -101,7 +138,15 @@ void loop() {
         if (len > 0) {
             packetBuffer[len] = '\0';
             std::string line = packetBuffer;
-            
+            if (line.substr(0, 4) == "run(") {
+                size_t first = line.find('"');
+                size_t last = line.find('"', first + 1);
+                if (first != std::string::npos && last != std::string::npos) {
+                    std::string targetFile = line.substr(first + 1, last - first - 1);
+                    execute_lua_file(targetFile.c_str());
+                    return; // 実行が終わったら loop の先頭に戻る
+                }
+            }            
             // 終端記号 "." が送られてきたら実行開始
             if (line == ".\n" || line == ".\r\n" || line == ".") {
                 Serial.println("--- Executing Accumulated Lua Code ---");

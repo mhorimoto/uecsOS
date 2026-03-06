@@ -26,4 +26,10 @@ void register_lua_functions(lua_State *L) {
     reg("i2c_begin", l_i2c_begin);
     reg("i2c_read", l_i2c_read);
     reg("i2c_write", l_i2c_write);
+
+    // USB
+    reg("usb_begin", l_usb_begin);
+    reg("usb_write", l_usb_write);
+    reg("usb_read", l_usb_read);
+
 }
