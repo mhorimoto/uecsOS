@@ -2,7 +2,7 @@
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 #include <TimeLib.h>
-
+    
 // --- 設定 ---
 IPAddress ntpServer(133, 243, 238, 164); // ntp.nict.jp
 const int NTP_PACKET_SIZE = 48;
