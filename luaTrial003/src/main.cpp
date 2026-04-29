@@ -6,7 +6,6 @@
 #include <string>
 #include "lua_functions.h"
 
-
 // --- 設定 ---
 #define VERSION "0.3.5"
 
