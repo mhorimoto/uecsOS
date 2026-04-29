@@ -41,4 +41,16 @@ int l_usb_read(lua_State *L) {
     return 1;
 }
 
+static const struct luaL_Reg usb_funcs[] = {
+    {"begin", l_usb_begin},
+    {"write", l_usb_write},
+    {"read",  l_usb_read},
+    {NULL, NULL}
+};
+
+int luaopen_usb(lua_State *L) {
+    luaL_newlib(L, usb_funcs);
+    return 1;
+}
+
 // ※将来的にMPSSEコマンドを送ってGPIOを操作する関数を追加予定

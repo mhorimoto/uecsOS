@@ -55,3 +55,31 @@ int l_i2c_write(lua_State *L) {
     lua_pushinteger(L, Wire.endTransmission());
     return 1;
 }
+
+// LCD用関数リスト
+static const struct luaL_Reg lcd_funcs[] = {
+    {"init",      l_lcd_init},
+    {"print",     l_lcd_print},
+    {"clear",     l_lcd_clear},
+    {"setCursor", l_lcd_setCursor},
+    {NULL, NULL}
+};
+
+// I2C用関数リスト
+static const struct luaL_Reg i2c_funcs[] = {
+    {"begin", l_i2c_begin},
+    {"read",  l_i2c_read},
+    {"write", l_i2c_write},
+    {NULL, NULL}
+};
+
+// モジュール登録用
+int luaopen_lcd(lua_State *L) {
+    luaL_newlib(L, lcd_funcs);
+    return 1;
+}
+
+int luaopen_i2c(lua_State *L) {
+    luaL_newlib(L, i2c_funcs);
+    return 1;
+}
