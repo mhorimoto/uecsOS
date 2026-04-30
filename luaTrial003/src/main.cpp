@@ -144,6 +144,7 @@ void setup() {
 }
 
 void loop() {
+    extern void execute_uecs_transmission(); // libuecs.cppの関数を呼び出すための宣言
     // 1. 1秒ごとにLCDとシリアルに表示
     static time_t prevDisplay = 0;
     if (now() != prevDisplay) {
@@ -156,6 +157,7 @@ void loop() {
         lcd.setCursor(0, 3);
         lcd.print(timeStr); // LCD表示処理（既存の関数へ timeStr を渡す）
     }
+    execute_uecs_transmission();
     // 2. UDPコマンドの待機と実行 (Executer機能)
     int packetSize = Udp.parsePacket();
     if (packetSize) {
