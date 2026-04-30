@@ -7,10 +7,10 @@
 #include "lua_functions.h"
 
 // --- 設定 ---
-#define VERSION "0.3.5"
+#define VERSION "0.3.9"
 
 bool ntp_synced = false;  // 時刻同期状態フラグ
-byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };
+byte mac[] = { 0x02, 0xa2, 0x73, 0x10, 0x00, 0x00 }; // MACアドレス（適宜変更してください）
 IPAddress ntpServer(133, 243, 238, 164); // ntp.nict.jp
 const int NTP_PACKET_SIZE = 48;
 byte ntpBuffer[NTP_PACKET_SIZE];
@@ -159,7 +159,6 @@ void loop() {
     // 2. UDPコマンドの待機と実行 (Executer機能)
     int packetSize = Udp.parsePacket();
     if (packetSize) {
-        Serial.printf("Raw Packet: %d bytes\n", packetSize);
         memset(packetBuffer, 0, sizeof(packetBuffer));
         int len = Udp.read(packetBuffer, sizeof(packetBuffer) - 1);
         
@@ -174,39 +173,40 @@ void loop() {
                 if (first != std::string::npos && last != std::string::npos) {
                     execute_lua_file(line.substr(first + 1, last - first - 1).c_str());
                 }
-            }
-            // 終端記号 "." で溜まったバッファを実行
-            else if (line.find('.') != std::string::npos) { 
-                // "." より前のコードをバッファに追加し、不要な空白や改行をトリミング
-                std::string cmd = line.substr(0, line.find('.'));
-                luaBuffer += cmd;
-
-                // デバッグ出力：これから実行するコードを「"」で囲って表示
-                Serial.print("Executing Lua: [");
-                Serial.print(luaBuffer.c_str());
-                Serial.println("]");
-
-                lua_State *L = luaL_newstate();
-                luaL_openlibs(L);
-                register_lua_functions(L);
-
-                // 環境変数のセットアップ
-                IPAddress ip = Ethernet.localIP();
-                String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
-                lua_pushstring(L, ipStr.c_str());
-                lua_setglobal(L, "my_ip");
-
-                // 実行とエラーハンドリング
-                if (luaL_dostring(L, luaBuffer.c_str()) != LUA_OK) {
-                    Serial.print("Lua Runtime Error: ");
-                    Serial.println(lua_tostring(L, -1));
-                }
-
-                lua_close(L);
-                luaBuffer = ""; 
-                Serial.println("--- Execution Finished ---");
             } else {
-                luaBuffer += line + "\n";
+                size_t dotPos = line.find_last_of('.');
+                // 終端記号 "." で溜まったバッファを実行
+                if (dotPos != std::string::npos) { 
+                    // ドットより前の部分をすべてバッファに追加
+                    luaBuffer += line.substr(0, dotPos);
+
+                    // デバッグ出力：これから実行するコードを「"」で囲って表示
+                    Serial.print("Executing Lua: [");
+                    Serial.print(luaBuffer.c_str());
+                    Serial.println("]");
+
+                    lua_State *L = luaL_newstate();
+                    luaL_openlibs(L);
+                    register_lua_functions(L);
+
+                    // 環境変数のセットアップ
+                    IPAddress ip = Ethernet.localIP();
+                    String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
+                    lua_pushstring(L, ipStr.c_str());
+                    lua_setglobal(L, "my_ip");
+
+                    // 実行とエラーハンドリング
+                    if (luaL_dostring(L, luaBuffer.c_str()) != LUA_OK) {
+                        Serial.print("Lua Runtime Error: ");
+                        Serial.println(lua_tostring(L, -1));
+                    }
+
+                    lua_close(L);
+                    luaBuffer = ""; 
+                    Serial.println("--- Execution Finished ---");
+                } else {
+                    luaBuffer += line + "\n";
+                }
             }
         }
     }
