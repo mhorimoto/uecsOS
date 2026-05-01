@@ -10,6 +10,8 @@ struct CCMData {
     uint8_t priority;        // 優先度 0-30 (数値が小さいほど優先度が高い)
     float value;         // 物理量
     uint8_t lifespan;     // 有効寿命 (最大180秒) : 1バイトを確保
+    uint8_t num_digit;    // 桁数
+    uint8_t decimal_places; // 小数点以下の桁数
     bool active = false;  // データの有効/無効フラグ（trueなら有効、falseなら無効）
 };
 

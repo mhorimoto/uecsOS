@@ -7,7 +7,7 @@
 #include "lua_functions.h"
 
 // --- 設定 ---
-#define VERSION "0.3.9"
+#define VERSION "0.3.11"
 
 bool ntp_synced = false;  // 時刻同期状態フラグ
 byte mac[] = { 0x02, 0xa2, 0x73, 0x10, 0x00, 0x00 }; // MACアドレス（適宜変更してください）
@@ -80,6 +80,7 @@ void execute_lua_file(const char* filename) {
 }
 
 void setup() {
+    extern bool set_uecs_slot_internal(char,const char*,uint8_t, uint8_t,uint16_t,uint8_t,float,uint8_t,uint8_t); // libuecs.cppの関数を呼び出すための宣言
     Serial.begin(115200);
     uint32_t startTime = millis();
     while (!Serial && (millis() - startTime < 5000));
@@ -140,6 +141,8 @@ void setup() {
     } else {
         Serial.println("No startupA.lua found.");
     }
+    // OS側からSLOT 0番に cnd を初期登録 (type='S', ccmtype="cnd") [cite: 30]
+    set_uecs_slot_internal('S', "cnd", 7, 1, 1, 29, 0,0,0);
     Serial.println("--- System Ready ---");
 }
 
