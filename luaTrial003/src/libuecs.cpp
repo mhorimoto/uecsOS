@@ -5,6 +5,8 @@
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 
+#define LIBUECS_VERSION "0.0.2"
+
 extern "C" {
     #include "lua.h"
     #include "lualib.h"
@@ -63,6 +65,29 @@ bool set_uecs_slot_internal(char p_type, const char* p_ccmtype, uint8_t room, ui
     return false;
 }
 
+// 特定のスロットを安全に開放する内部関数
+bool clear_uecs_slot_internal(const char* p_ccmtype, uint8_t room, uint8_t region, uint16_t order) {
+    // SLOT 0番（cnd専用）の保護ロジック
+    if (strcmp(p_ccmtype, "cnd") == 0) {
+        return false; 
+    }
+
+    for (int i = 1; i < MAX_UECS_SLOTS; i++) {
+        // CCMTYPE, ROOM, REGION, ORDER の4点が完全に一致する場合のみ開放
+        if (uecs_slots[i].active && 
+            strcmp(uecs_slots[i].ccmtype, p_ccmtype) == 0 && 
+            uecs_slots[i].room == room &&
+            uecs_slots[i].region == region &&
+            uecs_slots[i].order == order) {
+            
+            uecs_slots[i].active = false; 
+            memset(uecs_slots[i].ccmtype, 0, sizeof(uecs_slots[i].ccmtype)); 
+            return true;
+        }
+    }
+    return false; 
+}
+
 // Lua API: uecs.publish(type_str, ccm_str, room, region, order, priority, value, num_digit, decimal_places)
 // Lua APIは内部関数を呼び出す
 int l_uecs_publish(lua_State *L) {
@@ -80,9 +105,21 @@ int l_uecs_publish(lua_State *L) {
     return 0;
 }
 
+// Lua API: uecs.depublish(ccmtype, room, region, order)
+int l_uecs_depublish(lua_State *L) {
+    const char* ccmtype = luaL_checkstring(L, 1);
+    uint8_t room        = (uint8_t)luaL_checkinteger(L, 2);
+    uint8_t region      = (uint8_t)luaL_checkinteger(L, 3);
+    uint16_t order      = (uint16_t)luaL_checkinteger(L, 4);
+
+    bool success = clear_uecs_slot_internal(ccmtype, room, region, order);
+    lua_pushboolean(L, success);
+    return 1;
+}
+
 void execute_uecs_transmission() {
-    char vbuf[32],*ptr_buf;
-    char xml[513]; 
+    char vbuf[64],*ptr_buf,fmt[32];
+    char xml[1024]; 
     static uint32_t last_sent = 0;
     if (millis() - last_sent < 1000) return; // 1秒周期
     ptr_buf = &vbuf[0];
@@ -101,10 +138,10 @@ void execute_uecs_transmission() {
 
         // TIMEタグを含まない軽量なXML生成
         if (uecs_slots[i].decimal_places == 0) {
-            sprintf(vbuf,"%d",(int)uecs_slots[i].value);
+            snprintf(vbuf, sizeof(vbuf), "%d", (int)uecs_slots[i].value);
         } else {
-            sprintf(vbuf,"\"%%.%df\"",uecs_slots[i].decimal_places);
-            sprintf(vbuf, vbuf, uecs_slots[i].value);
+            snprintf(fmt, sizeof(fmt), "\"%%.%df\"",uecs_slots[i].decimal_places);
+            snprintf(vbuf, sizeof(vbuf), fmt, uecs_slots[i].value);
         }
         snprintf(xml, sizeof(xml),
             "<?xml version=\"1.0\"?>"
@@ -150,6 +187,7 @@ static const struct luaL_Reg uecs_funcs[] = {
     {"uptime", l_uecs_uptime},
     {"is_synced",l_uecs_is_synced},
     {"publish",   l_uecs_publish}, 
+    {"depublish", l_uecs_depublish},
     {NULL, NULL}
 };
 

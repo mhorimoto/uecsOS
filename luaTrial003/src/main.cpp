@@ -7,7 +7,7 @@
 #include "lua_functions.h"
 
 // --- 設定 ---
-#define VERSION "0.3.11"
+#define VERSION "0.3.14"
 
 bool ntp_synced = false;  // 時刻同期状態フラグ
 byte mac[] = { 0x02, 0xa2, 0x73, 0x10, 0x00, 0x00 }; // MACアドレス（適宜変更してください）
@@ -156,7 +156,6 @@ void loop() {
         char timeStr[32];
         sprintf(timeStr, "%04d/%02d/%02d %02d:%02d:%02d", 
                 year(), month(), day(), hour(), minute(), second());
-        Serial.println(timeStr);
         lcd.setCursor(0, 3);
         lcd.print(timeStr); // LCD表示処理（既存の関数へ timeStr を渡す）
     }
@@ -169,6 +168,12 @@ void loop() {
         
         if (len > 0) {
             packetBuffer[len] = '\0';
+            // 【デバッグ追加】受信した生のバイト列を確認
+            Serial.print("RAW UDP DATA: ");
+            for(int i=0; i<len; i++) {
+                Serial.printf("%02X ", (uint8_t)packetBuffer[i]);
+            }
+            Serial.println();
             std::string line = packetBuffer;
 
             // run("filename") コマンドの解析
