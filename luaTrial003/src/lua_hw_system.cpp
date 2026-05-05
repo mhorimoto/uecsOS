@@ -1,5 +1,6 @@
 #include "lua_functions.h"
 #include <TimeLib.h>
+#define LUA_HW_SYSTEM_VERSION "0.0.1"
 
 extern "C" {
     int l_my_print(lua_State *L) {

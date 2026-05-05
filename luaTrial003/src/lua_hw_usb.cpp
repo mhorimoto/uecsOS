@@ -1,5 +1,6 @@
 #include "lua_functions.h"
 #include <USBHost_t36.h>
+#define LUA_HW_USB_VERSION "0.0.1"
 
 // USBホストとシリアルデバイスの定義
 USBHost myusb;

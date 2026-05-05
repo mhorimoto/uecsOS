@@ -1,4 +1,5 @@
 #include "lua_functions.h"
+#define LUA_HW_SD_VERSION "0.0.1"
 
 int l_sd_dir(lua_State *L) {
     const char* path = luaL_optstring(L, 1, "/");
@@ -45,5 +46,18 @@ int l_sd_read(lua_State *L) {
     } else {
         lua_pushnil(L);
     }
+    return 1;
+}
+
+// lua_hw_sd.cpp 内に追加
+static const struct luaL_Reg sd_funcs[] = {
+    {"dir",    l_sd_dir},
+    {"read",   l_sd_read},
+    {"append", l_sd_append},
+    {NULL, NULL}
+};
+
+int luaopen_sd(lua_State *L) {
+    luaL_newlib(L, sd_funcs);
     return 1;
 }

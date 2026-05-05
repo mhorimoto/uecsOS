@@ -1,5 +1,6 @@
 #ifndef LUA_FUNCTIONS_H
 #define LUA_FUNCTIONS_H
+#define LUA_FUNCTIONS_H_VERSION "0.0.1"
 
 #include <Arduino.h>
 #include <SD.h>
@@ -55,6 +56,7 @@ extern "C" {
     int luaopen_lcd(lua_State *L);
     int luaopen_i2c(lua_State *L);
     int luaopen_usb(lua_State *L);
+    int luaopen_sd(lua_State *L);
 }
 
 

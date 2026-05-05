@@ -1,6 +1,6 @@
 #ifndef LIBUECS_H
 #define LIBUECS_H
-
+#define LIBUECS_H_VERSION "0.0.1"
 struct CCMData {
     char type;         // Receive,Send,Request,Response etc.
     char ccmtype[21];      // InAirTemp,InAirHumid,WAirTemp,InAirCO2, etc.

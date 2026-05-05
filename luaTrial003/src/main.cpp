@@ -7,7 +7,7 @@
 #include "lua_functions.h"
 
 // --- 設定 ---
-#define VERSION "0.3.14"
+#define VERSION "0.3.14a"
 
 bool ntp_synced = false;  // 時刻同期状態フラグ
 byte mac[] = { 0x02, 0xa2, 0x73, 0x10, 0x00, 0x00 }; // MACアドレス（適宜変更してください）
