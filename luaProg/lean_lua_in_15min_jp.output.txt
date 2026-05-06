@@ -1,0 +1,72 @@
+>lua "learn_lua_in_15min.lua"
+over 40
+false
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+the way of the future
+25
+100
+zaphod	nil	nil
+hello
+value1
+tau
+Sonmi~451
+6.28	tau
+@!#	qbert
+table: 0000000000cc9b90	1729
+true
+value1
+value2
+1.21
+gigawatts
+I say woof
+woof woof woof 
+>Exit code: 0
+
