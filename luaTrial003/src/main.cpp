@@ -4,10 +4,11 @@
 #include <TimeLib.h>
 #include <SD.h>
 #include <string>
+#include <map>
 #include "lua_functions.h"
 
 // --- 設定 ---
-#define VERSION "0.3.14a"
+#define VERSION "0.3.15b"
 
 bool ntp_synced = false;  // 時刻同期状態フラグ
 byte mac[] = { 0x02, 0xa2, 0x73, 0x10, 0x00, 0x00 }; // MACアドレス（適宜変更してください）
@@ -20,6 +21,10 @@ unsigned int localPort = 8888;
 unsigned long localNtpPort = 8889;
 char packetBuffer[1460];
 std::string luaBuffer = "";
+
+// プログラム保持用のマップ
+std::map<int, std::string> lua_program;
+
 
 // Teensy内蔵RTCから時刻を取得する関数（TimeLib用）
 time_t getTeensy3Time() {
@@ -146,6 +151,137 @@ void setup() {
     Serial.println("--- System Ready ---");
 }
 
+void save_lua_program(const char* filename) {
+    File f = SD.open(filename, FILE_WRITE);
+    if (f) {
+        f.truncate(); // 既存の内容を消去
+        for (auto const& [num, code] : lua_program) {
+            f.println(code.c_str()); // 保存時は行番号を除去して純粋なLuaファイルにする
+        }
+        f.close();
+        Serial.println("Saved to SD.");
+    } else {
+        Serial.println("Save failed.");
+    }
+}
+
+void load_lua_program(const char* filename) {
+    File f = SD.open(filename, FILE_READ); // ファイルを読み込みモードで開く
+    if (!f) {
+        Serial.print("Failed to load: ");
+        Serial.println(filename);
+        return;
+    }
+
+    lua_program.clear(); // 既存のメモリ上のプログラムを消去
+    int line_num = 10;   // 10番からスタート
+
+    while (f.available()) {
+        String l = f.readStringUntil('\n');
+        // Windowsの改行コード(\r\n)対策: 末尾の \r を除去
+        if (l.length() > 0 && l[l.length() - 1] == '\r') {
+            l.remove(l.length() - 1);
+        }
+        
+        // 自動で10刻みの行番号を付与してマップに登録
+        lua_program[line_num] = l.c_str();
+        line_num += 10;
+    }
+    f.close();
+    Serial.println("Loaded.");
+}
+
+void handle_serial_input(String line) {
+    line.trim();
+    if (line.length() == 0) return;
+
+    // 1. 行番号の判定
+    int first_space = line.indexOf(' ');
+    String first_word = (first_space > 0) ? line.substring(0, first_space) : line;
+    
+    bool is_num = true;
+    for (unsigned int i = 0; i < first_word.length(); i++) {
+        if (!isDigit(first_word[i])) { is_num = false; break; }
+    }
+
+    if (is_num) {
+        // 行番号あり：プログラムの登録
+        int line_num = first_word.toInt();
+        if (first_space > 0) {
+            lua_program[line_num] = line.substring(first_space + 1).c_str(); // 行番号をキー、コードを値として保存
+        } else {
+            lua_program.erase(line_num); // 行番号のみは行削除
+        }
+        return;
+    }
+
+    // 2. コマンド判定（RUN, LIST, NEW, etc...）
+    String cmd = line;
+    cmd.toUpperCase();
+
+    if (cmd == "RUN") {
+        std::string full_script = "";
+        for (auto const& [num, code] : lua_program) {
+            full_script += code;
+            full_script += "\n";
+        }
+        // Luaステートを作成して実行
+        lua_State *L = luaL_newstate();
+        luaL_openlibs(L);
+        register_lua_functions(L);
+        if (luaL_dostring(L, full_script.c_str()) != LUA_OK) {
+            Serial.println(lua_tostring(L, -1));
+        }
+        lua_close(L);
+        Serial.println("Ok");
+    } else if (cmd == "LIST") {
+        for (auto const& [num, code] : lua_program) {
+            Serial.printf("%d %s\n", num, code.c_str());
+        }
+    } else if (cmd == "NEW") {
+        lua_program.clear();
+        Serial.println("Ok");
+    } else if (cmd == "DIR") {
+        File dir = SD.open("/");
+        if (!dir) {
+            Serial.println("Failed to open SD root.");
+        } else {
+            while (true) {
+                File entry = dir.openNextFile();
+                if (!entry) break;
+                Serial.print(entry.name());
+                if (entry.isDirectory()) {
+                    Serial.println("/");
+                } else {
+                    Serial.print("\t");
+                    Serial.print(entry.size());
+                    Serial.println(" bytes");
+                }
+                entry.close();
+            }
+            dir.close();
+        }
+        Serial.println("Ok");
+    } else if (cmd.startsWith("SAVE ")) {
+        String filename = line.substring(5);
+        filename.trim();
+        save_lua_program(filename.c_str());
+    } else if (cmd.startsWith("LOAD ")) {
+        String filename = line.substring(5);
+        filename.trim();
+        load_lua_program(filename.c_str());
+    } else {
+        // 即時実行モード
+        lua_State *L = luaL_newstate();
+        luaL_openlibs(L);
+        register_lua_functions(L);
+        if (luaL_dostring(L, line.c_str()) != LUA_OK) {
+            Serial.println(lua_tostring(L, -1));
+        }
+        lua_close(L);
+    }
+}
+
 void loop() {
     extern void execute_uecs_transmission(); // libuecs.cppの関数を呼び出すための宣言
     // 1. 1秒ごとにLCDとシリアルに表示
@@ -219,5 +355,9 @@ void loop() {
                 }
             }
         }
+    }
+    if (Serial.available()) {
+        String line = Serial.readStringUntil('\n');
+        handle_serial_input(line);
     }
 }
