@@ -1,0 +1,10 @@
+# UECS-OS node情報のテンプレートコード
+
+MAC_ADDR = "02:A2:73:10:00:00"
+DHCP_FLAG = 0xFF              # 0xFF: DHCP有効, 0x00: 固定IP
+IP_ADDR = "192.168.120.177"
+NETMASK = "255.255.255.0"
+DEFGW   = "192.168.120.1"
+VENDER_NAME = "YS-Lab"
+NODE_NAME   = "uecsOS-M304N"
+LC_SEQ = 1
