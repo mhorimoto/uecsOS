@@ -8,7 +8,7 @@
 #include "lua_functions.h"
 
 // --- 設定 ---
-#define VERSION "0.3.15b"
+#define VERSION "0.3.16"
 
 bool ntp_synced = false;  // 時刻同期状態フラグ
 byte mac[] = { 0x02, 0xa2, 0x73, 0x10, 0x00, 0x00 }; // MACアドレス（適宜変更してください）
@@ -356,8 +356,27 @@ void loop() {
             }
         }
     }
-    if (Serial.available()) {
-        String line = Serial.readStringUntil('\n');
-        handle_serial_input(line);
+    static String serialBuffer = "";
+    if (Serial.available()>0) {
+        char c = Serial.read();
+        if (c == '\b' || c == 127) { 
+            // バックスペース（ASCII 8）または DEL（ASCII 127）の処理
+            if (serialBuffer.length() > 0) {
+                // 1. バッファから最後の1文字を削除
+                serialBuffer.remove(serialBuffer.length() - 1);
+                // 2. 画面上の文字を消す（戻る -> 空白で上書き -> もう一度戻る）
+                Serial.print("\b \b");
+            }
+        } else if (c == '\n' || c == '\r') {
+            if (serialBuffer.length() > 0) {
+                Serial.println();
+                handle_serial_input(serialBuffer);
+                serialBuffer = "";
+            }
+        } else if (c >= 32 && c <= 126) { 
+            // 制御文字（矢印キーなど）を除外した，通常の印字可能文字のみを受け付ける
+            serialBuffer += c;
+            Serial.print(c); // Teensy側から文字をエコーバックする
+        }
     }
 }
