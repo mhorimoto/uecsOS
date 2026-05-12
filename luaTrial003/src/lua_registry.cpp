@@ -1,9 +1,14 @@
 #include "lua_functions.h"
-#define LUA_REGISTRY_VERSION "0.0.1"
+#define LUA_REGISTRY_VERSION "0.0.3"
 
-//extern int luaopen_uecs(lua_State *L);
-//extern int luaopen_lcd(lua_State *L);
-//extern int luaopen_i2c(lua_State *L);
+extern "C" {
+    int luaopen_uecs(lua_State *L);
+    int luaopen_lcd(lua_State *L);
+    int luaopen_i2c(lua_State *L);
+    int luaopen_usb(lua_State *L);
+    int luaopen_sd(lua_State *L);
+    int luaopen_eeprom(lua_State *L);
+}
 
 void register_lua_functions(lua_State *L) {
 // ヘルパー関数: モジュールを登録してスタックをクリアする
@@ -18,6 +23,7 @@ void register_lua_functions(lua_State *L) {
     reg_mod("i2c",  luaopen_i2c);
     reg_mod("usb",  luaopen_usb); // USBもモジュールとして登録
     reg_mod("sd",   luaopen_sd);  // SDもモジュールとして登録
+    reg_mod("eeprom", luaopen_eeprom); // EEPROMもモジュールとして登録 VERSION 0.0.2で追加
 
     // --- 2. グローバル関数の登録 ---
     auto reg_glob = [&](const char* name, lua_CFunction f) {
@@ -30,11 +36,7 @@ void register_lua_functions(lua_State *L) {
     reg_glob("digitalWrite", l_digitalWrite);
     reg_glob("digitalRead", l_digitalRead);
     reg_glob("delay", l_delay);
-
-    // SD
-    //reg_glob("dir", l_sd_dir);
-    //reg_glob("sd_read", l_sd_read);
-    //reg_glob("sd_append", l_sd_append);
+    reg_glob("luamem", l_system_luamem); // VERSION 0.0.3で追加
 
     // LCD/I2C
     reg_glob("lcd_init", l_lcd_init);

@@ -1,6 +1,6 @@
 #ifndef LUA_FUNCTIONS_H
 #define LUA_FUNCTIONS_H
-#define LUA_FUNCTIONS_H_VERSION "0.0.1"
+#define LUA_FUNCTIONS_H_VERSION "0.0.2"
 
 #include <Arduino.h>
 #include <SD.h>
@@ -8,6 +8,11 @@
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 #include <USBHost_t36.h>
+
+// ArduinoコアとLuaのマクロ衝突（Warning）を回避する
+#undef stdin
+#undef stdout
+#undef stderr
 
 extern "C" {
     #include "lua.h"
@@ -20,6 +25,7 @@ extern "C" {
     int l_digitalWrite(lua_State *L);
     int l_digitalRead(lua_State *L);
     int l_delay(lua_State *L);
+    int l_system_luamem(lua_State *L);
 
     // SD系
     int l_sd_dir(lua_State *L);

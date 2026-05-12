@@ -1,4 +1,5 @@
-#include <Arduino.h>
+#include "system_config.h"
+//#include <Arduino.h>
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 #include <TimeLib.h>
@@ -12,10 +13,10 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.3.16a"
+#define VERSION "0.4.03"
 
 bool ntp_synced = false;  // 時刻同期状態フラグ
-byte mac[] = { 0x02, 0xa2, 0x73, 0x10, 0x00, 0x00 }; // MACアドレス（適宜変更してください）
+
 IPAddress ntpServer(133, 243, 238, 164); // ntp.nict.jp
 const int NTP_PACKET_SIZE = 48;
 byte ntpBuffer[NTP_PACKET_SIZE];
@@ -88,35 +89,8 @@ void execute_lua_file(const char* filename) {
     lua_close(L);
 }
 
-void sync_config_from_sd() {
-    const char* filename = "nodebase.cfg"; // バイナリファイル名
-    if (!SD.exists(filename)) return;
-
-    File f = SD.open(filename, FILE_READ);
-    if (!f) return;
-
-    // LC_SEQ (0x70) の比較
-    unsigned long sd_seq = 0;
-    f.seek(0x70);
-    f.read((uint8_t*)&sd_seq, sizeof(sd_seq));
-
-    unsigned long eep_seq = 0;
-    EEPROM.get(0x70, eep_seq);
-
-    // 初回（0xFFFFFFFF）または SD側が新しい場合に更新
-    if (eep_seq == 0xFFFFFFFF || sd_seq > eep_seq) {
-        f.seek(0);
-        for (int addr = 0; addr < 128; addr++) {
-            if (f.available()) {
-                uint8_t b = f.read();
-                EEPROM.update(addr, b); // 値が異なる時だけ書き込み（寿命保護）
-            }
-        }
-    }
-    f.close();
-}
-
 void setup() {
+    uint8_t current_mac[6];
     extern bool set_uecs_slot_internal(char,const char*,uint8_t, uint8_t,uint16_t,uint8_t,float,uint8_t,uint8_t); // libuecs.cppの関数を呼び出すための宣言
     Serial.begin(115200);
     uint32_t startTime = millis();
@@ -141,27 +115,38 @@ void setup() {
         Serial.println("SD Card initialized.");
         lcd.setCursor(0, 1);
         lcd.print("SD Init Success!");
+        sync_config_from_sd(); // SDカードからEEPROMへの設定同期
     }
-    sync_config_from_sd(); // SDカードからEEPROMへの設定同期
-
-    // 3. Ethernet初期化 (DHCP)
-    Serial.println("Attempting DHCP...");
-    lcd.setCursor(0, 2);
-    lcd.print("DHCP Requesting...");
-    
-    if (Ethernet.begin(mac) == 0) {
-        Serial.println("Failed to configure Ethernet using DHCP");
+    load_mac_address(current_mac); // EEPROMからMACアドレスを読み込む
+    if (is_dhcp_enabled()) {
+        // 3. Ethernet初期化 (DHCP)
+        Serial.println("Attempting DHCP...");
         lcd.setCursor(0, 2);
-        lcd.print("DHCP Failed!      ");
+        lcd.print("DHCP Requesting...");
+    
+        if (Ethernet.begin(current_mac) == 0) {
+            Serial.println("Failed to configure Ethernet using DHCP");
+            lcd.setCursor(0, 2);
+            lcd.print("DHCP Failed!      ");
+        } else {
+            IPAddress ip = Ethernet.localIP();
+            Serial.print("IP Address: ");
+            Serial.println(ip);
+            lcd.setCursor(0, 2);
+            lcd.print("IP: ");
+            lcd.print(ip);
+            Udp.begin(localPort);
+        }
     } else {
-        IPAddress ip = Ethernet.localIP();
-        Serial.print("IP Address: ");
+        // Ethernet初期化 (Static)
+        IPAddress ip, subnet, gateway, dns;
+        load_static_ip_config(ip, subnet, gateway, dns);
+        Ethernet.begin(current_mac, ip, dns, gateway, subnet);
+        Serial.print("Static IP: ");
         Serial.println(ip);
-        
         lcd.setCursor(0, 2);
         lcd.print("IP: ");
         lcd.print(ip);
-        
         Udp.begin(localPort);
     }
 

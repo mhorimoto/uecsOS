@@ -1,6 +1,6 @@
 #include "lua_functions.h"
 #include <TimeLib.h>
-#define LUA_HW_SYSTEM_VERSION "0.0.1"
+#define LUA_HW_SYSTEM_VERSION "0.0.2"
 
 extern "C" {
     int l_my_print(lua_State *L) {
@@ -51,12 +51,15 @@ extern "C" {
         delay(ms);
         return 0;
     }
-}
-// Lua側で uecs.time() として呼べる関数
-static int l_get_uecs_time(lua_State *L) {
-    char buf[32];
-    sprintf(buf, "%04d-%02d-%02dT%02d:%02d:%02d", 
-            year(), month(), day(), hour(), minute(), second());
-    lua_pushstring(L, buf); // UECS形式の文字列を返す
-    return 1;
+
+    // Luaエンジンの現在のメモリ使用量（バイト）を取得する関数 VERSION 0.0.2で追加
+    int l_system_luamem(lua_State *L) {
+        // LUA_GCCOUNT はキロバイト単位，LUA_GCCOUNTB はその端数（バイト）を返します
+        int kb = lua_gc(L, LUA_GCCOUNT, 0);
+        int bytes = lua_gc(L, LUA_GCCOUNTB, 0);
+        int total_bytes = (kb * 1024) + bytes;
+        
+        lua_pushinteger(L, total_bytes);
+        return 1; // 戻り値の数
+    }
 }
