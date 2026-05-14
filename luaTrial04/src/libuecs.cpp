@@ -110,7 +110,7 @@ void execute_uecs_transmission() {
     }
 }
 
-// 【新規追加】 受信エンジン (高速パース)
+// 受信エンジン (高速パース)
 void process_incoming_uecs() {
     int packetSize = UecsUdp.parsePacket();
     if (packetSize) {
@@ -182,7 +182,7 @@ void check_uecs_lifespan() {
     }
 }
 
-// --- Luaバインディング (既存のまま) ---
+// --- Luaバインディング ---
 static int l_uecs_time(lua_State *L) {
     char buf[32];
     sprintf(buf, "%04d-%02d-%02dT%02d:%02d:%02d", year(), month(), day(), hour(), minute(), second());
