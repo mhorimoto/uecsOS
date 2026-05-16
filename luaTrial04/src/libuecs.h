@@ -1,6 +1,6 @@
 #ifndef LIBUECS_H
 #define LIBUECS_H
-#define LIBUECS_H_VERSION "0.0.3"
+#define LIBUECS_H_VERSION "0.0.5"
 struct CCMData {
     char type;         // Receive,Send,Request,Response etc.
     char ccmtype[21];      // InAirTemp,InAirHumid,WAirTemp,InAirCO2, etc.
@@ -15,6 +15,9 @@ struct CCMData {
     uint32_t last_update_ms;// 最後に送信・受信した時刻(millis)
     bool valid = false;     // 【R専用】データが寿命内（有効）かどうか
     bool active = false;    // スロット自体が使用中かどうか
+    // --- cnd スロット(0番)専用のデータ保持 ---
+    uint32_t cnd_value = 0; // 欠落のない32bit整数
+    bool cnd_is_hex = false; // HEX表記("0x...")で出力するかのフラグ
 };
 
 #define MAX_UECS_SLOTS 10

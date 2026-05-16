@@ -16,7 +16,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.4.06"
+#define VERSION "0.4.06b"
 
 bool os_booted = false;   // OS起動完了フラグ
 bool ntp_synced = false;  // 時刻同期状態フラグ
@@ -93,23 +93,6 @@ void execute_lua_file(const char* filename) {
     lua_close(L);
 }
 
-// --- OSのマルチタスク基盤：delay()中もバックグラウンドタスクを回す ---
-extern "C" void yield() {
-    static bool is_yielding = false;
-    extern bool os_booted;
-    if (!os_booted) return;
-    if (is_yielding) return;
-    is_yielding = true;
-
-    // 待機時間を縫って、ネットワークと寿命監視の処理を走らせる
-    execute_uecs_transmission();
-    process_network_manager();
-    process_incoming_uecs();
-    check_uecs_lifespan();
-
-    is_yielding = false;
-}
-
 void setup() {
     uint8_t current_mac[6];
     //extern bool set_uecs_slot_internal(char,const char*,uint8_t, uint8_t,uint16_t,uint8_t,float,uint8_t,uint8_t,uint16_t);
@@ -182,16 +165,17 @@ void setup() {
     init_network_manager(); // 16529ポート開始 ネットワークマネージャーの初期化
     init_uecs_network();    // 16520ポート開始 UECSネットワークの初期化
 
+    // OS側からSLOT 0番に cnd を初期登録 (type='S', ccmtype="cnd") [cite: 30]
+    set_uecs_slot_internal('S', "cnd", 7, 1, 1, 29, 0,0,0,1);
+    Serial.println("--- System Ready ---");
+    os_booted = true;
+
     // 6. startup.lua の実行
     if (SD.exists("startup.lua")) {
         execute_lua_file("startupA.lua");
     } else {
         Serial.println("No startupA.lua found.");
     }
-    // OS側からSLOT 0番に cnd を初期登録 (type='S', ccmtype="cnd") [cite: 30]
-    set_uecs_slot_internal('S', "cnd", 7, 1, 1, 29, 0,0,0,1);
-    Serial.println("--- System Ready ---");
-    os_booted = true;
 }
 
 void save_lua_program(const char* filename) {

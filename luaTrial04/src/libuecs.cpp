@@ -5,7 +5,7 @@
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 
-#define LIBUECS_VERSION "0.0.5"
+#define LIBUECS_VERSION "0.0.8"
 
 extern "C" {
     #include "lua.h"
@@ -86,11 +86,22 @@ void execute_uecs_transmission() {
         if (current_ms - uecs_slots[i].last_update_ms >= interval_ms) {
             uecs_slots[i].last_update_ms = current_ms;
 
-            if (uecs_slots[i].decimal_places == 0) {
-                snprintf(vbuf, sizeof(vbuf), "%d", (int)uecs_slots[i].value);
+            // 0番スロット(cnd)は float を無視して 32bit整数/HEX で出力する
+            if (i == 0) {
+                if (uecs_slots[i].cnd_is_hex) {
+                    // 【修正】Warning対策: %lX と unsigned long キャストを使用
+                    snprintf(vbuf, sizeof(vbuf), "0x%08lX", (unsigned long)uecs_slots[i].cnd_value);
+                } else {
+                    snprintf(vbuf, sizeof(vbuf), "%lu", (unsigned long)uecs_slots[i].cnd_value);
+                }
             } else {
-                snprintf(fmt, sizeof(fmt), "%%.%df", uecs_slots[i].decimal_places);
-                snprintf(vbuf, sizeof(vbuf), fmt, uecs_slots[i].value);
+                // 通常のスロット (1〜9番) は今まで通り float で出力
+                if (uecs_slots[i].decimal_places == 0) {
+                    snprintf(vbuf, sizeof(vbuf), "%d", (int)uecs_slots[i].value);
+                } else {
+                    snprintf(fmt, sizeof(fmt), "%%.%df", uecs_slots[i].decimal_places);
+                    snprintf(vbuf, sizeof(vbuf), fmt, uecs_slots[i].value);
+                }
             }
             snprintf(xml, sizeof(xml),
                 "<?xml version=\"1.0\"?>"
@@ -193,9 +204,17 @@ static int l_uecs_uptime(lua_State *L) {
     lua_pushinteger(L, millis() / 1000); return 1;
 }
 
+// --- 【修正】関数内部にcnd保護を移動 ---
 int l_uecs_publish(lua_State *L) {
     const char* type_str = luaL_checkstring(L, 1);
     const char* ccmtype = luaL_checkstring(L, 2);
+
+    // cnd保護: publishで"cnd"を触ろうとしたら無視する
+    if (strncmp(ccmtype, "cnd", 3) == 0) {
+        Serial.println("UECS Warning: Use uecs.cnd() to update Slot 0. Normal publish ignored.");
+        return 0; 
+    }
+
     uint8_t room         = (uint8_t)luaL_checkinteger(L, 3);
     uint8_t region       = (uint8_t)luaL_checkinteger(L, 4);
     uint16_t order       = (uint16_t)luaL_checkinteger(L, 5);
@@ -209,27 +228,82 @@ int l_uecs_publish(lua_State *L) {
     return 0;
 }
 
+// --- スロットの個別削除（パラメータ指定 or 番号指定） ---
 int l_uecs_depublish(lua_State *L) {
-    const char* ccmtype = luaL_checkstring(L, 1);
-    uint8_t room        = (uint8_t)luaL_checkinteger(L, 2);
-    uint8_t region      = (uint8_t)luaL_checkinteger(L, 3);
-    
-    if (strcmp(ccmtype, "cnd") == 0) {
-        uecs_slots[0].active = false; return 0;
-    }
-    for (int i = 1; i < MAX_UECS_SLOTS; i++) {
-        if (uecs_slots[i].active && uecs_slots[i].room == room && uecs_slots[i].region == region && strcmp(uecs_slots[i].ccmtype, ccmtype) == 0) {
-            uecs_slots[i].active = false; break;
+    if (lua_type(L, 1) == LUA_TNUMBER) {
+        int target_slot = (int)luaL_checkinteger(L, 1);
+        if (target_slot == 0) {
+            Serial.println("UECS: Cannot depublish Slot 0 (cnd).");
+        } else if (target_slot >= 1 && target_slot < MAX_UECS_SLOTS) {
+            uecs_slots[target_slot].active = false;
+            uecs_slots[target_slot].valid = false;
+            Serial.printf("UECS: Slot %d deactivated by index.\n", target_slot);
         }
+        return 0;
+    } else if (lua_type(L, 1) == LUA_TSTRING) {
+        const char* ccmtype = luaL_checkstring(L, 1);
+        uint8_t room        = (uint8_t)luaL_checkinteger(L, 2);
+        uint8_t region      = (uint8_t)luaL_checkinteger(L, 3);
+        uint16_t order      = (uint16_t)luaL_checkinteger(L, 4); 
+
+        for (int i = 1; i < MAX_UECS_SLOTS; i++) {
+            if (uecs_slots[i].active && 
+                uecs_slots[i].room == room && 
+                uecs_slots[i].region == region && 
+                uecs_slots[i].order == order && 
+                strcmp(uecs_slots[i].ccmtype, ccmtype) == 0) {
+                
+                uecs_slots[i].active = false;
+                uecs_slots[i].valid = false;
+                Serial.printf("UECS: Slot %d (%s) deactivated by parameters.\n", i, ccmtype);
+                break; 
+            }
+        }
+        return 0;
     }
+    luaL_error(L, "Invalid arguments for uecs.depublish");
     return 0;
 }
+
+// --- 現在のスロット一覧をシリアルに出力する ---
+int l_uecs_list(lua_State *L) {
+    Serial.println("\n--- uecsOS Slot Monitor ---");
+    Serial.println("Slot | T | CCMType              | Room | Reg | Ord | Pri | Interval | Status");
+    Serial.println("------------------------------------------------------------------------------");
+    
+    for (int i = 0; i < MAX_UECS_SLOTS; i++) {
+        if (uecs_slots[i].active) {
+            char status[16];
+            if (uecs_slots[i].type == 'S') {
+                strcpy(status, "Active(S)");
+            } else {
+                strcpy(status, uecs_slots[i].valid ? "Valid(R)" : "Expired(R)");
+            }
+            
+            Serial.printf("%4d | %c | %-20s | %4d | %3d | %3d | %3d | %8d | %s\n",
+                          i,
+                          uecs_slots[i].type,
+                          uecs_slots[i].ccmtype,
+                          uecs_slots[i].room,
+                          uecs_slots[i].region,
+                          uecs_slots[i].order,
+                          uecs_slots[i].priority,
+                          uecs_slots[i].interval_sec,
+                          status);
+        } else {
+            Serial.printf("%4d | - | (Empty)              |   -  |  -  |  -  |  -  |        - | -\n", i);
+        }
+    }
+    Serial.println("------------------------------------------------------------------------------\n");
+    return 0;
+}
+
 
 // --- Luaからスロットの値を読み出す関数 ---
 int l_uecs_get(lua_State *L) {
     const char* ccmtype = luaL_checkstring(L, 1);
-    uint8_t room        = (uint8_t)luaL_optinteger(L, 2, 1); // 省略時は1
-    uint8_t region      = (uint8_t)luaL_optinteger(L, 3, 1); // 省略時は1
+    uint8_t room        = (uint8_t)luaL_optinteger(L, 2, 1); 
+    uint8_t region      = (uint8_t)luaL_optinteger(L, 3, 1); 
 
     for (int i = 0; i < MAX_UECS_SLOTS; i++) {
         if (uecs_slots[i].active && 
@@ -237,17 +311,74 @@ int l_uecs_get(lua_State *L) {
             uecs_slots[i].region == region && 
             strcmp(uecs_slots[i].ccmtype, ccmtype) == 0) {
             
-            // 値（数値）と、データが寿命内かどうかのフラグ（真偽値）の2つを返す
             lua_pushnumber(L, uecs_slots[i].value);
             lua_pushboolean(L, uecs_slots[i].valid);
             return 2; 
         }
     }
-    
-    // スロットが見つからない場合
     lua_pushnil(L);
-    lua_pushboolean(L, false);
     return 2;
+}
+
+// --- スロットを一括解除する（0番のcndは保護） ---
+void clear_uecs_slots() {
+    for (int i = 1; i < MAX_UECS_SLOTS; i++) {
+        uecs_slots[i].active = false;
+        uecs_slots[i].valid = false;
+    }
+    Serial.println("UECS: All slots (except Slot 0) cleared.");
+}
+
+int l_uecs_clear(lua_State *L) {
+    clear_uecs_slots();
+    return 0;
+}
+
+// --- cndスロット(0番)専用の更新関数 ---
+int l_uecs_cnd(lua_State *L) {
+    const char* ccmtype = luaL_checkstring(L, 1);
+    
+    if (strlen(ccmtype) == 0 || strncmp(ccmtype, "cnd", 3) != 0) {
+        luaL_error(L, "cnd ccmtype must start with 'cnd' and cannot be empty.");
+        return 0;
+    }
+
+    uint8_t room     = (uint8_t)luaL_checkinteger(L, 2);
+    uint8_t region   = (uint8_t)luaL_checkinteger(L, 3);
+    uint16_t order   = (uint16_t)luaL_checkinteger(L, 4);
+    uint8_t priority = (uint8_t)luaL_checkinteger(L, 5);
+
+    uint32_t val = 0;
+    bool is_hex = false;
+
+    if (lua_type(L, 6) == LUA_TSTRING) {
+        const char* val_str = lua_tostring(L, 6);
+        if (strncmp(val_str, "0x", 2) == 0 || strncmp(val_str, "0X", 2) == 0) {
+            val = strtoul(val_str, NULL, 16); 
+            is_hex = true;
+        } else {
+            val = strtoul(val_str, NULL, 10); 
+        }
+    } else {
+        val = (uint32_t)lua_tonumber(L, 6);   
+    }
+
+    uecs_slots[0].type = 'S';
+    strncpy(uecs_slots[0].ccmtype, ccmtype, 20);
+    uecs_slots[0].ccmtype[20] = '\0';
+    uecs_slots[0].room = room;
+    uecs_slots[0].region = region;
+    uecs_slots[0].order = order;
+    uecs_slots[0].priority = priority;
+    
+    uecs_slots[0].cnd_value = val;
+    uecs_slots[0].cnd_is_hex = is_hex;
+    
+    uecs_slots[0].interval_sec = 1; 
+    uecs_slots[0].active = true;
+    uecs_slots[0].valid = true;
+
+    return 0;
 }
 
 static const struct luaL_Reg uecs_funcs[] = {
@@ -255,7 +386,10 @@ static const struct luaL_Reg uecs_funcs[] = {
     {"uptime",    l_uecs_uptime},
     {"publish",   l_uecs_publish},
     {"depublish", l_uecs_depublish},
+    {"list",      l_uecs_list},
+    {"clear",     l_uecs_clear},
     {"get",       l_uecs_get},
+    {"cnd",       l_uecs_cnd},
     {NULL, NULL}
 };
 
