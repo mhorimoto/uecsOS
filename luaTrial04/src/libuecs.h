@@ -26,10 +26,12 @@ extern CCMData uecs_slots[MAX_UECS_SLOTS];
 // APIプロトタイプ (interval_secを追加)
 bool set_uecs_slot_internal(char p_type, const char* p_ccmtype, uint8_t room, uint8_t region, uint16_t order, uint8_t priority, float value, uint8_t num_digit, uint8_t decimal_places, uint16_t interval_sec);
 
-// --- UECSネットワーク管理用 ---
+// --- UECSネットワーク管理用（16520ポート） ---
 void init_uecs_network();           // UDP 16520ポートのバインド
 void execute_uecs_transmission();   // 送信(S)スロットの処理
 void process_incoming_uecs();       // 受信(R)スロットの処理
 void check_uecs_lifespan();         // 寿命監視用関数
-
+// --- UECS管理電文プロセッサー（16529ポートの実務担当） ---
+void reply_to_nodescan(IPAddress remoteIP, uint16_t remotePort);
+void reply_to_ccmscan(IPAddress remoteIP, uint16_t remotePort);
 #endif

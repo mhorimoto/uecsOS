@@ -4,7 +4,7 @@
 #include <NativeEthernetUdp.h>
 #include <EEPROM.h>
 
-#define NETWORK_MANAGER_VERSION "0.0.2"
+#define NETWORK_MANAGER_VERSION "0.0.3"
 
 EthernetUDP NodeScanUdp;
 const unsigned int NODESCAN_PORT = 16529;
@@ -17,6 +17,7 @@ void init_network_manager() {
 
 void process_network_manager() {
     int packetSize = NodeScanUdp.parsePacket();
+    extern void reply_to_ccmscan(IPAddress remoteIP, uint16_t remotePort);
     if (packetSize) {
         char packetBuffer[256];
         int len = NodeScanUdp.read(packetBuffer, sizeof(packetBuffer) - 1);
@@ -81,7 +82,9 @@ void process_network_manager() {
                 NodeScanUdp.endPacket();
                 
                 Serial.printf("Network: Replied to NODESCAN from %d.%d.%d.%d\n", remIP[0], remIP[1], remIP[2], remIP[3]);
-            }
+            } else if (strstr(packetBuffer, "CCMSCAN") != NULL || strstr(packetBuffer, "ccmscan") != NULL) {
+                reply_to_ccmscan(NodeScanUdp.remoteIP(), NodeScanUdp.remotePort());
+                Serial.println("Network: Received CCMSCAN request, but will be handled by UECS engine.");
         }
     }
 }

@@ -393,6 +393,79 @@ static const struct luaL_Reg uecs_funcs[] = {
     {NULL, NULL}
 };
 
+// --- NODESCAN応答エンジン ---
+void reply_to_nodescan(IPAddress remoteIP, uint16_t remotePort) {
+    char xml[512];
+    IPAddress ip = Ethernet.localIP();
+    uint8_t mac[6];
+    Ethernet.MACAddress(mac);
+
+    // UECS規約に準拠したNODE情報XMLの組み立て
+    snprintf(xml, sizeof(xml),
+        "<?xml version=\"1.0\"?>"
+        "<UECS ver=\"1.00-E10\">"
+        "<NODE>"
+        "<IP>%d.%d.%d.%d</IP>"
+        "<MAC>%02X%02X%02X%02X%02X%02X</MAC>"
+        "</NODE>"
+        "</UECS>",
+        ip[0], ip[1], ip[2], ip[3],
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    // UecsUdp（16520番のインスタンス）を使い回すか，
+    // あるいは送信元のポート（16529など）へ確実に撃ち返す
+    UecsUdp.beginPacket(remoteIP, remotePort);
+    UecsUdp.write(xml);
+    UecsUdp.endPacket();
+
+    Serial.printf("UECS: Replied to NODESCAN from %d.%d.%d.%d\n", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3]);
+}
+// --- CCMSCAN応答エンジン ---
+void reply_to_ccmscan(IPAddress remoteIP, uint16_t remotePort) {
+    char xml[1024]; // 全スロット(最大10)を収容するためのバッファ
+    char ccm_buf[128];
+    
+    IPAddress ip = Ethernet.localIP();
+    uint8_t mac[6];
+    Ethernet.MACAddress(mac); // NativeEthernetの標準関数でMACを取得
+
+    // UECS XMLヘッダとノード情報
+    snprintf(xml, sizeof(xml),
+        "<?xml version=\"1.0\"?>\n"
+        "<UECS ver=\"1.00-E10\">\n"
+        "<IP>%d.%d.%d.%d</IP>\n"
+        "<MAC>%02X%02X%02X%02X%02X%02X</MAC>\n",
+        ip[0], ip[1], ip[2], ip[3],
+        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    // アクティブな全スロットをXMLタグ化して追加
+    for (int i = 0; i < MAX_UECS_SLOTS; i++) {
+        if (uecs_slots[i].active) {
+            snprintf(ccm_buf, sizeof(ccm_buf),
+                "<CCM type=\"%c\" room=\"%d\" region=\"%d\" order=\"%d\" priority=\"%d\" ccmtype=\"%s\" />\n",
+                uecs_slots[i].type,
+                uecs_slots[i].room,
+                uecs_slots[i].region,
+                uecs_slots[i].order,
+                uecs_slots[i].priority,
+                uecs_slots[i].ccmtype);
+            
+            // バッファオーバーフロー防止を兼ねて結合
+            strncat(xml, ccm_buf, sizeof(xml) - strlen(xml) - 1);
+        }
+    }
+    
+    // フッタを追加
+    strncat(xml, "</UECS>", sizeof(xml) - strlen(xml) - 1);
+
+    // 要求元(PC等)のIPとポートへ返信
+    UecsUdp.beginPacket(remoteIP, remotePort);
+    UecsUdp.write(xml);
+    UecsUdp.endPacket();
+    
+    Serial.printf("UECS: Replied to CCMSCAN from %d.%d.%d.%d\n", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3]);
+}
+
 int luaopen_uecs(lua_State *L) {
     luaL_newlib(L, uecs_funcs); return 1;
 }
