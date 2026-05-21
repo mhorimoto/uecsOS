@@ -1,11 +1,13 @@
 #include "lua_functions.h"
 #include "libuecs.h"
+#include "system_config.h"
 #include <Arduino.h>
 #include <TimeLib.h>
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
+#include <EEPROM.h>
 
-#define LIBUECS_VERSION "0.0.8"
+#define LIBUECS_VERSION "0.0.9"
 
 extern "C" {
     #include "lua.h"
@@ -399,18 +401,47 @@ void reply_to_nodescan(IPAddress remoteIP, uint16_t remotePort) {
     IPAddress ip = Ethernet.localIP();
     uint8_t mac[6];
     Ethernet.MACAddress(mac);
+    char uecs_id_str[13];
+    uint8_t uecs_id[6];
+    char vender_name[17];
+    char node_name[17];
+
+    // 1. EEPROMから UECS ID を取得 (6バイトを16進数文字列へ)
+    for(int i=0; i<6; i++) uecs_id[i] = EEPROM.read(ADDR_UECS_ID + i);
+    snprintf(uecs_id_str, sizeof(uecs_id_str), "%02X%02X%02X%02X%02X%02X", 
+                uecs_id[0], uecs_id[1], uecs_id[2], uecs_id[3], uecs_id[4], uecs_id[5]);
+
+    // 2. EEPROMから VENDER NAME を取得し、末尾の空白やNULLをトリム
+    for(int i=0; i<16; i++) vender_name[i] = EEPROM.read(ADDR_VENDER_NAME + i);
+    vender_name[16] = '\0';
+    for(int i=15; i>=0; i--) { 
+        if(vender_name[i]==' ' || vender_name[i]=='\0') vender_name[i]='\0'; 
+            else break; 
+    }
+
+    // 3. EEPROMから NODE NAME を取得し、末尾をトリム
+    for(int i=0; i<16; i++) node_name[i] = EEPROM.read(ADDR_NODE_NAME + i);
+    node_name[16] = '\0';
+    for(int i=15; i>=0; i--) { 
+        if(node_name[i]==' ' || node_name[i]=='\0') node_name[i]='\0'; 
+            else break; 
+    }
 
     // UECS規約に準拠したNODE情報XMLの組み立て
     snprintf(xml, sizeof(xml),
-        "<?xml version=\"1.0\"?>"
-        "<UECS ver=\"1.00-E10\">"
-        "<NODE>"
-        "<IP>%d.%d.%d.%d</IP>"
-        "<MAC>%02X%02X%02X%02X%02X%02X</MAC>"
-        "</NODE>"
-        "</UECS>",
-        ip[0], ip[1], ip[2], ip[3],
-        mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            "<?xml version=\"1.0\"?>"
+            "<UECS ver=\"1.00-E10\">"
+            "<NODE>"
+            "<NAME>%s</NAME>"
+            "<VENDER>%s</VENDER>"
+            "<UECSID>%s</UECSID>"
+            "<IP>%d.%d.%d.%d</IP>"
+            "<MAC>%02X%02X%02X%02X%02X%02X</MAC>"
+            "</NODE>"
+            "</UECS>",
+            node_name, vender_name, uecs_id_str,
+            ip[0], ip[1], ip[2], ip[3],
+            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     // UecsUdp（16520番のインスタンス）を使い回すか，
     // あるいは送信元のポート（16529など）へ確実に撃ち返す

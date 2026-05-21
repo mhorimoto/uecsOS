@@ -16,7 +16,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.4.06b"
+#define VERSION "0.4.07"
 
 bool os_booted = false;   // OS起動完了フラグ
 bool ntp_synced = false;  // 時刻同期状態フラグ

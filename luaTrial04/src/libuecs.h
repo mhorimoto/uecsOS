@@ -1,6 +1,8 @@
 #ifndef LIBUECS_H
 #define LIBUECS_H
-#define LIBUECS_H_VERSION "0.0.5"
+#define LIBUECS_H_VERSION "0.0.6"
+#include <Arduino.h>
+#include <NativeEthernet.h>
 struct CCMData {
     char type;         // Receive,Send,Request,Response etc.
     char ccmtype[21];      // InAirTemp,InAirHumid,WAirTemp,InAirCO2, etc.
