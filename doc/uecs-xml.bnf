@@ -1,0 +1,227 @@
+/*
+
+  UECS XML BNF記述
+  Version 1.00
+  YS-Lab <mh@ys-lab.info>
+
+ */
+
+<uecs_message> ::= <xml_decl> <ws> <uecs_root>
+
+<xml_decl> ::= "<?xml version=\"1.0\"?>"
+
+/* UECSルート */
+<uecs_root> ::= "<UECS"
+                <S> "ver=\"" <version> "\""
+                <ws> ">"
+                <ws>
+                <data_elem>
+                <ws>
+                <ip_elem>
+                <ws>
+                "</UECS>"
+
+/* DATA要素 */
+<data_elem> ::= "<DATA"
+                <S> "type=\"" <type_str> "\""
+                <S> "room=\"" <number> "\""
+                <S> "region=\"" <number> "\""
+                <S> "order=\"" <number> "\""
+                <S> "priority=\"" <number> "\""
+                <ws> ">"
+                <value>
+                "</DATA>"
+
+/* IP要素 */
+<ip_elem> ::= "<IP>" <ipv4_addr> "</IP>"
+
+/* バージョン */
+<version> ::= "1.00-E10" | <attr_string>
+
+/* DATA type属性 */
+<type_str> ::= <attr_string>
+
+/* DATA値 */
+<value> ::= <text_string> | <number> | <float>
+
+/* IPv4 */
+<ipv4_addr> ::= <ipv4_octet> "."
+                <ipv4_octet> "."
+                <ipv4_octet> "."
+                <ipv4_octet>
+
+/*
+ * IPv4の0-255を厳密記述
+ */
+<ipv4_octet> ::= "0"
+               | <nonzero_digit>
+               | <nonzero_digit> <digit>
+               | "1" <digit> <digit>
+               | "2" <digit_0_4> <digit>
+               | "25" <digit_0_5>
+
+/* 数値 */
+<number> ::= <digit> | <digit> <number_tail>
+
+<number_tail> ::= ""
+                | <digit> <number_tail>
+
+/* 浮動小数点 */
+<float> ::= <number> "." <number>
+          | "-" <number> "." <number>
+
+/* 数字 */
+<digit> ::= "0"
+          | "1"
+          | "2"
+          | "3"
+          | "4"
+          | "5"
+          | "6"
+          | "7"
+          | "8"
+          | "9"
+
+<nonzero_digit> ::= "1"
+                  | "2"
+                  | "3"
+                  | "4"
+                  | "5"
+                  | "6"
+                  | "7"
+                  | "8"
+                  | "9"
+
+<digit_0_4> ::= "0"
+              | "1"
+              | "2"
+              | "3"
+              | "4"
+
+<digit_0_5> ::= "0"
+              | "1"
+              | "2"
+              | "3"
+              | "4"
+              | "5"
+
+/*
+ * XML属性用文字
+ * 禁止: ", <, &
+ */
+<attr_char> ::= <safe_punct_attr>
+              | <digit>
+              | <alpha>
+              | <space_char>
+
+/*
+ * XMLテキスト用文字
+ * 禁止: <, &
+ */
+<text_char> ::= <safe_punct_text>
+              | <digit>
+              | <alpha>
+              | <space_char>
+
+/* 属性文字列 */
+<attr_string> ::= <attr_char>
+                | <attr_char> <attr_string_tail>
+
+<attr_string_tail> ::= ""
+                     | <attr_char> <attr_string_tail>
+
+/* テキスト文字列 */
+<text_string> ::= <text_char>
+                | <text_char> <text_string_tail>
+
+<text_string_tail> ::= ""
+                     | <text_char> <text_string_tail>
+
+/* 英字 */
+<alpha> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g"
+          | "h" | "i" | "j" | "k" | "l" | "m" | "n"
+          | "o" | "p" | "q" | "r" | "s" | "t" | "u"
+          | "v" | "w" | "x" | "y" | "z"
+          | "A" | "B" | "C" | "D" | "E" | "F" | "G"
+          | "H" | "I" | "J" | "K" | "L" | "M" | "N"
+          | "O" | "P" | "Q" | "R" | "S" | "T" | "U"
+          | "V" | "W" | "X" | "Y" | "Z"
+
+/*
+ * XML属性に使える安全な記号
+ * 除外: ", <, &
+ */
+<safe_punct_attr> ::= "!"
+                    | "#"
+                    | "$"
+                    | "%"
+                    | "'"
+                    | "("
+                    | ")"
+                    | "*"
+                    | "+"
+                    | ","
+                    | "-"
+                    | "."
+                    | "/"
+                    | ":"
+                    | ";"
+                    | "="
+                    | "?"
+                    | "@"
+                    | "["
+                    | "\\"
+                    | "]"
+                    | "^"
+                    | "_"
+                    | "`"
+                    | "{"
+                    | "|"
+                    | "}"
+                    | "~"
+
+/*
+ * XMLテキストに使える安全な記号
+ * 除外: <, &
+ */
+<safe_punct_text> ::= "\""
+                    | "!"
+                    | "#"
+                    | "$"
+                    | "%"
+                    | "'"
+                    | "("
+                    | ")"
+                    | "*"
+                    | "+"
+                    | ","
+                    | "-"
+                    | "."
+                    | "/"
+                    | ":"
+                    | ";"
+                    | "="
+                    | "?"
+                    | "@"
+                    | "["
+                    | "\\"
+                    | "]"
+                    | "^"
+                    | "_"
+                    | "`"
+                    | "{"
+                    | "|"
+                    | "}"
+                    | "~"
+
+/* 空白 */
+<space_char> ::= " "
+               | "\t"
+               | "\r"
+               | "\n"
+
+<S> ::= <space_char>
+      | <space_char> <S>
+
+<ws> ::= ""
+       | <space_char> <ws>
