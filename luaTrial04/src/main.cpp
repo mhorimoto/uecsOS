@@ -1,5 +1,6 @@
 #include "system_config.h"
-//#include <Arduino.h>
+#include "system_time.h"
+#include "serial_shell.h"
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 #include <TimeLib.h>
@@ -16,60 +17,18 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.4.10" // バージョン番号
+#define VERSION "0.5.01" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
-bool ntp_synced = false;  // 時刻同期状態フラグ
 
-IPAddress ntpServer(133, 243, 238, 164); // ntp.nict.jp
-const int NTP_PACKET_SIZE = 48;
-byte ntpBuffer[NTP_PACKET_SIZE];
-
-EthernetUDP Udp,NtpUdp;
 unsigned int localPort = 8888;
-unsigned long localNtpPort = 8889;
+EthernetUDP Udp;
 char packetBuffer[1460];
 std::string luaBuffer = "";
 
 // プログラム保持用のマップ
 std::map<int, std::string> lua_program;
 
-
-// Teensy内蔵RTCから時刻を取得する関数（TimeLib用）
-time_t getTeensy3Time() {
-    return Teensy3Clock.get();
-}
-
-// NTPサーバーにリクエストを送信
-void sendNTPpacket(IPAddress& address) {
-    memset(ntpBuffer, 0, NTP_PACKET_SIZE);
-    ntpBuffer[0] = 0b11100011;   // LI, Version, Mode
-    NtpUdp.beginPacket(address, 123);
-    NtpUdp.write(ntpBuffer, NTP_PACKET_SIZE);
-    NtpUdp.endPacket();
-}
-
-// NTP同期を試みる関数
-bool syncWithNTP() {
-    NtpUdp.begin(localNtpPort);
-    sendNTPpacket(ntpServer);
-    uint32_t beginWait = millis();
-    while (millis() - beginWait < 5000) {
-        if (NtpUdp.parsePacket()) {
-            NtpUdp.read(ntpBuffer, NTP_PACKET_SIZE);
-            unsigned long highWord = word(ntpBuffer[40], ntpBuffer[41]);
-            unsigned long lowWord = word(ntpBuffer[42], ntpBuffer[43]);
-            time_t epoch = (highWord << 16 | lowWord) - 2208988800UL + (9 * 3600); // JST
-            setTime(epoch);
-            Teensy3Clock.set(epoch);
-            ntp_synced = true;
-            NtpUdp.stop();
-            return true;
-        }
-    }
-    NtpUdp.stop();
-    return false;
-}
 // --- OSの状態（時計）をLCDに表示する関数 ---
 void update_os_display() {
     static time_t prevDisplay = 0;
@@ -200,7 +159,7 @@ void setup() {
     }
 
     // 4. 内部RTC同期設定
-    setSyncProvider(getTeensy3Time);
+    init_system_time();
 
     // 5. NTP同期
     if (syncWithNTP()) {
@@ -262,106 +221,8 @@ void load_lua_program(const char* filename) {
     Serial.println("Loaded.");
 }
 
-void handle_serial_input(String line) {
-    line.trim();
-    if (line.length() == 0) return;
-
-    // 1. 行番号の判定
-    int first_space = line.indexOf(' ');
-    String first_word = (first_space > 0) ? line.substring(0, first_space) : line;
-    
-    bool is_num = true;
-    for (unsigned int i = 0; i < first_word.length(); i++) {
-        if (!isDigit(first_word[i])) { is_num = false; break; }
-    }
-
-    if (is_num) {
-        // 行番号あり：プログラムの登録
-        int line_num = first_word.toInt();
-        if (first_space > 0) {
-            lua_program[line_num] = line.substring(first_space + 1).c_str(); // 行番号をキー、コードを値として保存
-        } else {
-            lua_program.erase(line_num); // 行番号のみは行削除
-        }
-        return;
-    }
-
-    // 2. コマンド判定（RUN, LIST, NEW, etc...）
-    String cmd = line;
-    cmd.toUpperCase();
-
-    if (cmd == "RUN") {
-        std::string full_script = "";
-        for (auto const& [num, code] : lua_program) {
-            full_script += code;
-            full_script += "\n";
-        }
-        // Luaステートを作成して実行
-        lua_State *L = luaL_newstate();
-        luaL_openlibs(L);
-        register_lua_functions(L);
-        lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
-        if (luaL_dostring(L, full_script.c_str()) != LUA_OK) {
-            Serial.println(lua_tostring(L, -1));
-        }
-        lua_close(L);
-        Serial.println("Ok");
-    } else if (cmd == "LIST") {
-        for (auto const& [num, code] : lua_program) {
-            Serial.printf("%d %s\n", num, code.c_str());
-        }
-    } else if (cmd == "NEW") {
-        lua_program.clear();
-        Serial.println("Ok");
-    } else if (cmd == "DIR") {
-        File dir = SD.open("/");
-        if (!dir) {
-            Serial.println("Failed to open SD root.");
-        } else {
-            while (true) {
-                File entry = dir.openNextFile();
-                if (!entry) break;
-                Serial.print(entry.name());
-                if (entry.isDirectory()) {
-                    Serial.println("/");
-                } else {
-                    Serial.print("\t");
-                    Serial.print(entry.size());
-                    Serial.println(" bytes");
-                }
-                entry.close();
-            }
-            dir.close();
-        }
-        Serial.println("Ok");
-    } else if (cmd.startsWith("SAVE ")) {
-        String filename = line.substring(5);
-        filename.trim();
-        save_lua_program(filename.c_str());
-    } else if (cmd.startsWith("LOAD ")) {
-        String filename = line.substring(5);
-        filename.trim();
-        load_lua_program(filename.c_str());
-    } else {
-        // 即時実行モード
-        lua_State *L = luaL_newstate();
-        luaL_openlibs(L);
-        register_lua_functions(L);
-        lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
-        if (luaL_dostring(L, line.c_str()) != LUA_OK) {
-            Serial.println(lua_tostring(L, -1));
-        }
-        lua_close(L);
-    }
-}
-
 void loop() {
-    //extern void execute_uecs_transmission(); // libuecs.cppの関数を呼び出すための宣言
-    //extern void process_network_manager();  // ネットワークマネージャーの定期処理
-    //extern void process_incoming_uecs();
-    //extern void check_uecs_lifespan();
     // 1. 1秒ごとにLCDとシリアルに表示
-//    static time_t prevDisplay = 0;
     update_os_display();
     execute_uecs_transmission();
     process_network_manager();
@@ -427,27 +288,5 @@ void loop() {
             }
         }
     }
-    static String serialBuffer = "";
-    if (Serial.available()>0) {
-        char c = Serial.read();
-        if (c == '\b' || c == 127) { 
-            // バックスペース（ASCII 8）または DEL（ASCII 127）の処理
-            if (serialBuffer.length() > 0) {
-                // 1. バッファから最後の1文字を削除
-                serialBuffer.remove(serialBuffer.length() - 1);
-                // 2. 画面上の文字を消す（戻る -> 空白で上書き -> もう一度戻る）
-                Serial.print("\b \b");
-            }
-        } else if (c == '\n' || c == '\r') {
-            if (serialBuffer.length() > 0) {
-                Serial.println();
-                handle_serial_input(serialBuffer);
-                serialBuffer = "";
-            }
-        } else if (c >= 32 && c <= 126) { 
-            // 制御文字（矢印キーなど）を除外した，通常の印字可能文字のみを受け付ける
-            serialBuffer += c;
-            Serial.print(c); // Teensy側から文字をエコーバックする
-        }
-    }
+    process_serial_shell();
 }
