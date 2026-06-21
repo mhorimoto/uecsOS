@@ -16,7 +16,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.4.07"
+#define VERSION "0.4.10" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 bool ntp_synced = false;  // 時刻同期状態フラグ
@@ -70,6 +70,49 @@ bool syncWithNTP() {
     NtpUdp.stop();
     return false;
 }
+// --- OSの状態（時計）をLCDに表示する関数 ---
+void update_os_display() {
+    static time_t prevDisplay = 0;
+    // now() が前回表示した時刻と変わっていれば更新（1秒に1回だけ実行される）
+    if (now() != prevDisplay) {
+        prevDisplay = now();
+        
+        char timeStr[32];
+        sprintf(timeStr, "%04d/%02d/%02d %02d:%02d:%02d", 
+                year(), month(), day(), hour(), minute(), second());
+        
+        // LCDへの出力
+        lcd.setCursor(0, 3);
+        lcd.print(timeStr); 
+    }
+}
+// --- 究極の要塞化：Lua強制フック関数 ---
+void lua_os_hook(lua_State *L, lua_Debug *ar) {
+    extern void execute_uecs_transmission();
+    extern void process_network_manager();
+    extern void process_incoming_uecs();
+    extern void check_uecs_lifespan();
+    
+    update_os_display();  // LCD表示の更新を強制的に行う
+    // --- 緊急停止（Halt）シグナルの監視 ---
+    while (Serial.available() > 0) {
+        char c = Serial.read();
+        // ASCII 3 (Ctrl+C) または ASCII 27 (ESC) を検知したら強制終了
+        if (c == 3 || c == 27) {
+            Serial.println("\n[OS] Emergency Halt Triggered!");
+            // Lua VMにエラーを投げ込み、実行スタックを強制的に破壊してC++へ戻る
+            luaL_error(L, "Script halted by OS Interrupt"); 
+        }
+    }
+    // ネットワークエンジンを強制駆動
+    execute_uecs_transmission();
+    process_network_manager();
+    process_incoming_uecs();
+    check_uecs_lifespan();
+    
+    // Teensy純正のバックグラウンド処理（Ethernetのハードウェアバッファ等）も回す
+    yield(); 
+}
 
 // --- Luaファイル実行部 ---
 void execute_lua_file(const char* filename) {
@@ -77,7 +120,8 @@ void execute_lua_file(const char* filename) {
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
     register_lua_functions(L);
-    
+    lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
+
     IPAddress ip = Ethernet.localIP();
     String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
     lua_pushstring(L, ipStr.c_str());
@@ -110,7 +154,7 @@ void setup() {
     delay(1000);
     lcd.setCursor(0, 0);
     lcd.print("uecsOS BLD:" VERSION);
-    
+    Serial.println("uecsOS Starting ... BLD: " VERSION);
     // 2. SDカード初期化
     if (!SD.begin(BUILTIN_SDCARD)) {
         Serial.println("SD Card failed!");
@@ -256,6 +300,7 @@ void handle_serial_input(String line) {
         lua_State *L = luaL_newstate();
         luaL_openlibs(L);
         register_lua_functions(L);
+        lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
         if (luaL_dostring(L, full_script.c_str()) != LUA_OK) {
             Serial.println(lua_tostring(L, -1));
         }
@@ -302,6 +347,7 @@ void handle_serial_input(String line) {
         lua_State *L = luaL_newstate();
         luaL_openlibs(L);
         register_lua_functions(L);
+        lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
         if (luaL_dostring(L, line.c_str()) != LUA_OK) {
             Serial.println(lua_tostring(L, -1));
         }
@@ -315,16 +361,8 @@ void loop() {
     //extern void process_incoming_uecs();
     //extern void check_uecs_lifespan();
     // 1. 1秒ごとにLCDとシリアルに表示
-    static time_t prevDisplay = 0;
-    if (now() != prevDisplay) {
-        prevDisplay = now();
-        
-        char timeStr[32];
-        sprintf(timeStr, "%04d/%02d/%02d %02d:%02d:%02d", 
-                year(), month(), day(), hour(), minute(), second());
-        lcd.setCursor(0, 3);
-        lcd.print(timeStr); // LCD表示処理（既存の関数へ timeStr を渡す）
-    }
+//    static time_t prevDisplay = 0;
+    update_os_display();
     execute_uecs_transmission();
     process_network_manager();
     process_incoming_uecs();
@@ -367,7 +405,7 @@ void loop() {
                     lua_State *L = luaL_newstate();
                     luaL_openlibs(L);
                     register_lua_functions(L);
-
+                    lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
                     // 環境変数のセットアップ
                     IPAddress ip = Ethernet.localIP();
                     String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
