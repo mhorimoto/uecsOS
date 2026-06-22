@@ -1,7 +1,6 @@
 #include "lua_functions.h"
-#define LUA_HW_LCD_VERSION "0.0.1"
-
-LiquidCrystal_I2C lcd(0x3F, 20, 4);
+#include "system_lcd.h"
+#define LUA_HW_LCD_VERSION "0.0.2"
 
 extern "C" {
     int l_lcd_init(lua_State *L) {

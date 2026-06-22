@@ -1,6 +1,8 @@
 #include "system_config.h"
 #include "system_time.h"
 #include "serial_shell.h"
+#include "lua_executor.h"
+#include "system_lcd.h"
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 #include <TimeLib.h>
@@ -17,7 +19,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.01" // バージョン番号
+#define VERSION "0.5.03" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -26,93 +28,14 @@ EthernetUDP Udp;
 char packetBuffer[1460];
 std::string luaBuffer = "";
 
-// プログラム保持用のマップ
-std::map<int, std::string> lua_program;
-
-// --- OSの状態（時計）をLCDに表示する関数 ---
-void update_os_display() {
-    static time_t prevDisplay = 0;
-    // now() が前回表示した時刻と変わっていれば更新（1秒に1回だけ実行される）
-    if (now() != prevDisplay) {
-        prevDisplay = now();
-        
-        char timeStr[32];
-        sprintf(timeStr, "%04d/%02d/%02d %02d:%02d:%02d", 
-                year(), month(), day(), hour(), minute(), second());
-        
-        // LCDへの出力
-        lcd.setCursor(0, 3);
-        lcd.print(timeStr); 
-    }
-}
-// --- 究極の要塞化：Lua強制フック関数 ---
-void lua_os_hook(lua_State *L, lua_Debug *ar) {
-    extern void execute_uecs_transmission();
-    extern void process_network_manager();
-    extern void process_incoming_uecs();
-    extern void check_uecs_lifespan();
-    
-    update_os_display();  // LCD表示の更新を強制的に行う
-    // --- 緊急停止（Halt）シグナルの監視 ---
-    while (Serial.available() > 0) {
-        char c = Serial.read();
-        // ASCII 3 (Ctrl+C) または ASCII 27 (ESC) を検知したら強制終了
-        if (c == 3 || c == 27) {
-            Serial.println("\n[OS] Emergency Halt Triggered!");
-            // Lua VMにエラーを投げ込み、実行スタックを強制的に破壊してC++へ戻る
-            luaL_error(L, "Script halted by OS Interrupt"); 
-        }
-    }
-    // ネットワークエンジンを強制駆動
-    execute_uecs_transmission();
-    process_network_manager();
-    process_incoming_uecs();
-    check_uecs_lifespan();
-    
-    // Teensy純正のバックグラウンド処理（Ethernetのハードウェアバッファ等）も回す
-    yield(); 
-}
-
-// --- Luaファイル実行部 ---
-void execute_lua_file(const char* filename) {
-    if (!SD.exists(filename)) return;
-    lua_State *L = luaL_newstate();
-    luaL_openlibs(L);
-    register_lua_functions(L);
-    lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
-
-    IPAddress ip = Ethernet.localIP();
-    String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
-    lua_pushstring(L, ipStr.c_str());
-    lua_setglobal(L, "my_ip");
-
-    File f = SD.open(filename);
-    if (f) {
-        String script = "";
-        while (f.available()) script += (char)f.read();
-        f.close();
-        luaL_dostring(L, script.c_str());
-    }
-    lua_close(L);
-}
-
 void setup() {
     uint8_t current_mac[6];
-    //extern bool set_uecs_slot_internal(char,const char*,uint8_t, uint8_t,uint16_t,uint8_t,float,uint8_t,uint8_t,uint16_t);
-    //extern void init_uecs_network();
     Serial.begin(115200);
     uint32_t startTime = millis();
     while (!Serial && (millis() - startTime < 5000));
 
     // 1. LCD初期化
-    lcd.init();
-    lcd.backlight();
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("uecsOS Starting...");
-    delay(1000);
-    lcd.setCursor(0, 0);
-    lcd.print("uecsOS BLD:" VERSION);
+    init_system_lcd(VERSION);
     Serial.println("uecsOS Starting ... BLD: " VERSION);
     // 2. SDカード初期化
     if (!SD.begin(BUILTIN_SDCARD)) {
@@ -179,46 +102,6 @@ void setup() {
     } else {
         Serial.println("No startupA.lua found.");
     }
-}
-
-void save_lua_program(const char* filename) {
-    File f = SD.open(filename, FILE_WRITE);
-    if (f) {
-        f.truncate(); // 既存の内容を消去
-        for (auto const& [num, code] : lua_program) {
-            f.println(code.c_str()); // 保存時は行番号を除去して純粋なLuaファイルにする
-        }
-        f.close();
-        Serial.println("Saved to SD.");
-    } else {
-        Serial.println("Save failed.");
-    }
-}
-
-void load_lua_program(const char* filename) {
-    File f = SD.open(filename, FILE_READ); // ファイルを読み込みモードで開く
-    if (!f) {
-        Serial.print("Failed to load: ");
-        Serial.println(filename);
-        return;
-    }
-
-    lua_program.clear(); // 既存のメモリ上のプログラムを消去
-    int line_num = 10;   // 10番からスタート
-
-    while (f.available()) {
-        String l = f.readStringUntil('\n');
-        // Windowsの改行コード(\r\n)対策: 末尾の \r を除去
-        if (l.length() > 0 && l[l.length() - 1] == '\r') {
-            l.remove(l.length() - 1);
-        }
-        
-        // 自動で10刻みの行番号を付与してマップに登録
-        lua_program[line_num] = l.c_str();
-        line_num += 10;
-    }
-    f.close();
-    Serial.println("Loaded.");
 }
 
 void loop() {

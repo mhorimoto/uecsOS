@@ -3,12 +3,7 @@
 #include <map>
 #include <string>
 #include "lua_functions.h"
-
-// main.cppにある変数や関数をexternで参照（次回のLua分離で綺麗になります）
-extern std::map<int, std::string> lua_program;
-extern void save_lua_program(const char* filename);
-extern void load_lua_program(const char* filename);
-extern void lua_os_hook(lua_State *L, lua_Debug *ar);
+#include "lua_executor.h"
 
 static void handle_serial_input(String line) {
     line.trim();
