@@ -3,11 +3,11 @@
 #include "serial_shell.h"
 #include "lua_executor.h"
 #include "system_lcd.h"
+#include "system_sd.h"
+#include "system_network.h"
 #include <NativeEthernet.h>
 #include <NativeEthernetUdp.h>
 #include <TimeLib.h>
-#include <SD.h>
-#include <EEPROM.h>
 #include <string>
 #include <map>
 #include "network_manager.h"
@@ -19,7 +19,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.03" // バージョン番号
+#define VERSION "0.5.04" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -34,63 +34,21 @@ void setup() {
     uint32_t startTime = millis();
     while (!Serial && (millis() - startTime < 5000));
 
-    // 1. LCD初期化
+    // 1. UI(LCD)初期化
     init_system_lcd(VERSION);
     Serial.println("uecsOS Starting ... BLD: " VERSION);
-    // 2. SDカード初期化
-    if (!SD.begin(BUILTIN_SDCARD)) {
-        Serial.println("SD Card failed!");
-        lcd.setCursor(0, 1);
-        lcd.print("SD Init Failed!");
-    } else {
-        Serial.println("SD Card initialized.");
-        lcd.setCursor(0, 1);
-        lcd.print("SD Init Success!");
-        sync_config_from_sd(); // SDカードからEEPROMへの設定同期
-    }
-    load_mac_address(current_mac); // EEPROMからMACアドレスを読み込む
-    if (is_dhcp_enabled()) {
-        // 3. Ethernet初期化 (DHCP)
-        Serial.println("Attempting DHCP...");
-        lcd.setCursor(0, 2);
-        lcd.print("DHCP Requesting...");
-    
-        if (Ethernet.begin(current_mac) == 0) {
-            Serial.println("Failed to configure Ethernet using DHCP");
-            lcd.setCursor(0, 2);
-            lcd.print("DHCP Failed!      ");
-        } else {
-            IPAddress ip = Ethernet.localIP();
-            Serial.print("IP Address: ");
-            Serial.println(ip);
-            lcd.setCursor(0, 2);
-            lcd.print("IP: ");
-            lcd.print(ip);
-            Udp.begin(localPort);
-        }
-    } else {
-        // Ethernet初期化 (Static)
-        IPAddress ip, subnet, gateway, dns;
-        load_static_ip_config(ip, subnet, gateway, dns);
-        Ethernet.begin(current_mac, ip, dns, gateway, subnet);
-        Serial.print("Static IP: ");
-        Serial.println(ip);
-        lcd.setCursor(0, 2);
-        lcd.print("IP: ");
-        lcd.print(ip);
-        Udp.begin(localPort);
-    }
-
+    // 2. ストレージ(SDカードとEEPROM設定)初期化
+    init_system_sd();
+    // 3. ネットワーク初期化
+    init_system_network();
     // 4. 内部RTC同期設定
     init_system_time();
-
-    // 5. NTP同期
     if (syncWithNTP()) {
         Serial.println("NTP synced.");
     }
+    // 5. UECSプロトコルスタックの初期化
     init_network_manager(); // 16529ポート開始 ネットワークマネージャーの初期化
     init_uecs_network();    // 16520ポート開始 UECSネットワークの初期化
-
     // OS側からSLOT 0番に cnd を初期登録 (type='S', ccmtype="cnd") [cite: 30]
     set_uecs_slot_internal('S', "cnd", 7, 1, 1, 29, 0,0,0,1);
     Serial.println("--- System Ready ---");
