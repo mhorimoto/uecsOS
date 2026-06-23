@@ -68,11 +68,18 @@ extern "C" {
         return 1;
     }
 
+    // --- Luaから usb.isConnected() を呼べるようにする ---
+    int l_usb_isConnected(lua_State *L) {
+        lua_pushboolean(L, myftdi.isConnected());
+        return 1;
+    }
+
     static const struct luaL_Reg usb_funcs[] = {
         {"begin", l_usb_begin},
         {"write", l_usb_write},
         {"read",  l_usb_read},
         {"power", l_usb_power},
+        {"isConnected", l_usb_isConnected},
         {NULL, NULL}
     };
 
