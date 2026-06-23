@@ -5,7 +5,7 @@
 #include "network_manager.h"
 #include "libuecs.h"
 
-#define LUA_HW_SYSTEM_VERSION "0.0.3"
+#define LUA_HW_SYSTEM_VERSION "0.0.4"
 
 extern "C" {
     int l_my_print(lua_State *L) {
@@ -49,20 +49,24 @@ extern "C" {
         return 1; 
     }
 
-    // 【大幅修正】Luaのdelayをスマート待機に変更
     int l_delay(lua_State *L) {
-        int ms = (int)luaL_checkinteger(L, 1);
+        uint32_t ms = (uint32_t)luaL_checkinteger(L, 1);
         uint32_t start = millis();
+    
+        while (millis() - start < ms) {
+            // ここでOSのバックグラウンドタスク(UECS通信など)を処理
+            // process_network_manager();
+            // execute_uecs_transmission();
         
-        // 指定されたミリ秒が経過するまで、ネットワークタスクを回し続ける
-        while (millis() - start < (uint32_t)ms) {
-            execute_uecs_transmission();
-            process_network_manager();
-            process_incoming_uecs();
-            check_uecs_lifespan();
-            
-            // Teensy純正のバックグラウンド処理(Ethernet等)を動かすため1msだけ標準delay
-            delay(1); 
+            // --- ブレイク信号(Ctrl+C または ESC)の監視を追加 ---
+            if (Serial.available()) {
+                char c = Serial.read();
+                if (c == 0x03 || c == 0x1B) { // 0x03: Ctrl+C, 0x1B: ESC
+                    // Lua VMに対して即座にエラーを発生させ、スクリプト実行を強制終了
+                    return luaL_error(L, "Interrupted by User (Ctrl+C / ESC)");
+                }
+            }
+            yield(); // Teensyの内部タスクに時間を譲る
         }
         return 0;
     }
