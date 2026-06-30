@@ -19,7 +19,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.08" // バージョン番号
+#define VERSION "0.5.09" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
