@@ -4,6 +4,10 @@ FT232H_MPSSE::FT232H_MPSSE(USBHost &host)
     : USBDriver(), bulk_in(nullptr), bulk_out(nullptr),
       device_ready(false), init_phase(0), claimed_dev(nullptr),
       current_adbus(0xFF), current_acbus(0xFF) {
+    // タイマースロットを全クリア
+    for (int i = 0; i < FT_TIMED_RELAY_MAX; i++) {
+        _timers[i].active = false;
+    }
     init();
 }
 
@@ -16,14 +20,14 @@ void FT232H_MPSSE::init() {
 
 void FT232H_MPSSE::setADBUS(uint8_t value) {
     if (!device_ready) return;
-    current_adbus = value; // 状態を更新
+    current_adbus = value;
     uint8_t cmd[3] = { 0x80, value, 0xFF };
     bulk_write(cmd, 3);
 }
 
 void FT232H_MPSSE::setACBUS(uint8_t value) {
     if (!device_ready) return;
-    current_acbus = value; // 状態を更新
+    current_acbus = value;
     uint8_t cmd[3] = { 0x82, value, 0xFF };
     bulk_write(cmd, 3);
 }
@@ -58,11 +62,70 @@ void FT232H_MPSSE::writeADBUSBit(uint8_t bit, bool state) {
 void FT232H_MPSSE::writeACBUSBit(uint8_t bit, bool state) {
     if (bit > 7) return;
     if (state) {
-        current_acbus &= ~(1 << bit); 
+        current_acbus &= ~(1 << bit);
     } else {
-        current_acbus |= (1 << bit);  
+        current_acbus |= (1 << bit);
     }
     setACBUS(current_acbus);
+}
+
+// ============================================================
+// 非ブロッキング・パルス出力
+//   ONして duration_ms 後に自動OFFする
+//   同じピンに再度呼ばれた場合はタイマーをリセット（延長）する
+//   ※農業制御では呼び出し間隔をLua側（スクリプト定期実行）で
+//     制御するため、上書きリセットが自然な動作となる
+// ============================================================
+bool FT232H_MPSSE::pinPulse(char port, uint8_t bit, uint32_t duration_ms) {
+    if (!device_ready) return false;
+
+    // 即座にON
+    if      (port == 'd') writeADBUSBit(bit, true);
+    else if (port == 'c') writeACBUSBit(bit, true);
+    else return false;
+
+    // 既存スロットを検索（同じport/bitがあれば上書き）
+    int slot = -1;
+    for (int i = 0; i < FT_TIMED_RELAY_MAX; i++) {
+        if (_timers[i].active && _timers[i].port == port && _timers[i].bit == bit) {
+            slot = i;
+            break;
+        }
+    }
+    // なければ空きスロットを確保
+    if (slot < 0) {
+        for (int i = 0; i < FT_TIMED_RELAY_MAX; i++) {
+            if (!_timers[i].active) { slot = i; break; }
+        }
+    }
+    if (slot < 0) {
+        Serial.println("[FT232H] pinPulse: timer slot full!");
+        return false;
+    }
+
+    _timers[slot].active    = true;
+    _timers[slot].port      = port;
+    _timers[slot].bit       = bit;
+    _timers[slot].off_at_ms = millis() + duration_ms;
+    return true;
+}
+
+// ============================================================
+// タイマー処理（loop() と lua_os_hook() の両方から呼ぶ）
+//   millis() オーバーフロー対策として符号付き差分比較を使用
+//   （約49日周期のオーバーフローでも正しく動作する）
+// ============================================================
+void FT232H_MPSSE::processTimers() {
+    uint32_t now = millis();
+    for (int i = 0; i < FT_TIMED_RELAY_MAX; i++) {
+        if (!_timers[i].active) continue;
+        if ((int32_t)(now - _timers[i].off_at_ms) >= 0) {
+            // 期限切れ → OFFにする
+            if (_timers[i].port == 'd') writeADBUSBit(_timers[i].bit, false);
+            else                        writeACBUSBit(_timers[i].bit, false);
+            _timers[i].active = false;
+        }
+    }
 }
 
 void FT232H_MPSSE::bulk_write(const uint8_t *data, uint32_t len) {
@@ -144,6 +207,10 @@ void FT232H_MPSSE::disconnect() {
     bulk_out    = nullptr;
     claimed_dev = nullptr;
     init_phase  = 0;
-    current_adbus = 0xFF; // 切断時に内部状態もリセット
+    current_adbus = 0xFF;
     current_acbus = 0xFF;
+    // 切断時はタイマースロットも全クリア
+    for (int i = 0; i < FT_TIMED_RELAY_MAX; i++) {
+        _timers[i].active = false;
+    }
 }

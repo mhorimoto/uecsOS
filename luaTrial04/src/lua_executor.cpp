@@ -1,6 +1,7 @@
 #include "lua_executor.h"
 #include <SD.h>
 #include <NativeEthernet.h>
+#include "USB_FT232H_MPSSE.h"
 
 // main.cpp に残るUI関数とネットワークエンジンの外部参照
 extern void update_os_display(); 
@@ -8,6 +9,11 @@ extern void execute_uecs_transmission();
 extern void process_network_manager();
 extern void process_incoming_uecs();
 extern void check_uecs_lifespan();
+
+// lua_hw_usb.cpp で定義されているFT232Hインスタンスの外部参照
+// processTimers() をフック内で呼ぶことで、Luaが無限ループに陥っても
+// タイマーによるリレーOFF処理が継続して動作する
+extern FT232H_MPSSE ft232h;
 
 // プログラム保持用のマップの実体
 std::map<int, std::string> lua_program;
@@ -31,6 +37,11 @@ void lua_os_hook(lua_State *L, lua_Debug *ar) {
     process_network_manager();
     process_incoming_uecs();
     check_uecs_lifespan();
+
+    // リレー・タイマー処理を強制駆動
+    // Luaが無限ループ中でも 10000命令ごとに呼ばれるため、
+    // ft_pin_pulse() のOFF処理がブロックされない
+    ft232h.processTimers();
     
     // Teensy純正のバックグラウンド処理
     yield(); 

@@ -4,6 +4,18 @@
 #include <Arduino.h>
 #include <USBHost_t36.h>
 
+// ============================================================
+// 非ブロッキング・タイマー管理（ft_pin_pulse用）
+// ============================================================
+#define FT_TIMED_RELAY_MAX 16   // 同時管理できるチャンネル数上限
+
+struct FT_TimedRelay {
+    bool     active;       // このスロットが使用中か
+    char     port;         // 'd'=ADBUS, 'c'=ACBUS
+    uint8_t  bit;          // ビット番号 0-7
+    uint32_t off_at_ms;    // この millis() を過ぎたらOFFにする
+};
+
 class FT232H_MPSSE : public USBDriver {
 public:
     FT232H_MPSSE(USBHost &host);
@@ -17,10 +29,18 @@ public:
     void allOff();
     void allOn();
 
-    // 【新規追加】ビット単位の書き込み（state: true=ON/点灯, false=OFF/消灯）
-    // ※内部で負論理(0=ON, 1=OFF)への変換を自動で行います
+    // ビット単位の書き込み（state: true=ON, false=OFF）
+    // 内部で負論理(0=ON, 1=OFF)への変換を自動で行う
     void writeADBUSBit(uint8_t bit, bool state);
     void writeACBUSBit(uint8_t bit, bool state);
+
+    // ============================================================
+    // 非ブロッキング・パルス出力
+    //   ONして duration_ms 後に自動OFFする（delay()不使用）
+    //   loop() および lua_os_hook() から processTimers() を呼ぶこと
+    // ============================================================
+    bool pinPulse(char port, uint8_t bit, uint32_t duration_ms);
+    void processTimers();   // loop() と lua_os_hook() の両方から呼ぶ
 
 protected:
     virtual bool claim(Device_t *dev, int type, const uint8_t *descriptors, uint32_t len) override;
@@ -42,6 +62,9 @@ private:
     // ピンの状態をクラス内で保持（初期値は全消灯 = 0xFF）
     uint8_t    current_adbus;
     uint8_t    current_acbus;
+
+    // タイマースロット
+    FT_TimedRelay _timers[FT_TIMED_RELAY_MAX];
 
     void init();
     void bulk_write(const uint8_t *data, uint32_t len);
