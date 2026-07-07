@@ -13,13 +13,14 @@
 #include "network_manager.h"
 #include "lua_functions.h"
 #include "libuecs.h"
+#include "USB_FT232H_MPSSE.h"
 
 
 #define LC_SEQ          0x70 // 4 bytes (unsigned long)
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.10" // バージョン番号
+#define VERSION "0.5.11" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -56,19 +57,21 @@ void setup() {
 
     // 6. startup.lua の実行
     if (SD.exists("startup.lua")) {
-        execute_lua_file("startupA.lua");
+        execute_lua_file("startup.lua");
     } else {
-        Serial.println("No startupA.lua found.");
+        Serial.println("No startup.lua found.");
     }
 }
 
 void loop() {
+    extern FT232H_MPSSE ft232h;
     // 1. 1秒ごとにLCDとシリアルに表示
     update_os_display();
     execute_uecs_transmission();
     process_network_manager();
     process_incoming_uecs();
     check_uecs_lifespan();
+    ft232h.processTimers();
     // 2. UDPコマンドの待機と実行 (Executer機能)
     int packetSize = Udp.parsePacket();
     if (packetSize) {
