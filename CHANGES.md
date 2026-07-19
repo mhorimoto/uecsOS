@@ -1,3 +1,77 @@
+# uecsOS パッチ3 変更サマリ（SCHEDコマンドによるスケジューラ切替）
+
+対象: BLD 0.5.11（永続VM実装済み）→ 0.5.14
+前提: uecsOS_patch2.zip（永続Lua VM実装）が反映済みであること
+
+---
+
+## 変更ファイル一覧
+
+| ファイル | 変更種別 | 概要 |
+|---|---|---|
+| `lua_executor.h` | 変更 | `reload_persistent_lua()` / `get_active_scheduler_filename()` を追加 |
+| `lua_executor.cpp` | 変更 | VM読み込み処理を`_persistent_vm_load()`に共通化、ポインタファイル対応 |
+| `serial_shell.cpp` | 変更 | `SCHED` / `SCHED <filename>` コマンドを追加 |
+| `main.cpp` | 変更なし | VERSIONのみ0.5.12に更新（patch2からロジック変更なし） |
+| `scheduler.lua` | 変更なし | デフォルトのスケジューラプログラム（patch2と同一） |
+
+---
+
+## 新規コマンド：`SCHED`
+
+シリアルシェルから使用します。
+
+```
+SCHED              → 現在アクティブなスケジューラファイル名を表示
+SCHED progA.lua    → 永続VMを破棄・再生成し、progA.luaを即座に有効化
+```
+
+### 動作の流れ
+
+```
+SCHED progA.lua 実行
+  ↓
+1. 現在のg_lua_main（永続VM）をlua_close()で破棄
+2. progA.lua が SDに存在するか確認
+3. 新しいVMを生成し、progA.luaを読み込んで実行
+   （トップレベルのグローバル変数初期化・exec関数定義が走る）
+4. 成功したら /active_scheduler.txt に "progA.lua" と記録
+5. 次回起動時は自動的にprogA.luaが読み込まれる
+```
+
+### 安全性について
+
+FT232Hのパルスタイマー（`_timers[]`）はLua VMとは独立したC++オブジェクト
+（`ft232h`）で管理されているため、`SCHED`でVMを切り替えても、
+**動作中のパルスは中断されず、指定時間が来れば正しくOFFになります**。
+
+---
+
+## 複数プログラムの運用イメージ
+
+```
+SD:/
+├── scheduler.lua        ← デフォルト（出荷時）
+├── progA.lua             ← 農家が試作した制御パターンA
+├── progB.lua             ← 制御パターンB
+└── active_scheduler.txt  ← 現在選択中のファイル名（自動生成・自動更新）
+```
+
+農家やオペレーターは、シリアルシェル経由で自由に切り替えて試せます。
+どのファイルが有効かは常に `SCHED`（引数なし）で確認できます。
+
+---
+
+## 既存コマンドとの違い（混同注意）
+
+| コマンド | 対象 | 用途 |
+|---|---|---|
+| `LOAD <file>` / `RUN` | 対話編集バッファ（使い捨てVM） | デバッグ・単発コード実行 |
+| `SCHED <file>` | **永続VM（スケジューラ）** | 本番の制御ロジック切り替え |
+
+`LOAD`/`RUN`は行番号付きBASIC風のプログラム編集・使い捨て実行用で、
+`exec1sec`等のスケジューラ関数とは無関係です。制御ロジックを切り替えたい
+場合は必ず `SCHED` を使ってください。
 # uecsOS パッチ変更サマリ
 
 対象ブランチ: `main` / ディレクトリ: `luaTrial04/src/`

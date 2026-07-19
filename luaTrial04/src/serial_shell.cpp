@@ -19,7 +19,7 @@ static void handle_serial_input(String line) {
     }
 
     if (is_num) {
-        // 行番号あり：プログラムの登録
+        // 行番号あり：プログラムの登録（対話編集用・従来のまま）
         int line_num = first_word.toInt();
         if (first_space > 0) {
             lua_program[line_num] = line.substring(first_space + 1).c_str(); 
@@ -34,6 +34,7 @@ static void handle_serial_input(String line) {
     cmd.toUpperCase();
 
     if (cmd == "RUN") {
+        // 対話編集バッファ(lua_program)を使い捨てVMで実行（従来のまま）
         std::string full_script = "";
         for (auto const& [num, code] : lua_program) {
             full_script += code;
@@ -84,8 +85,36 @@ static void handle_serial_input(String line) {
         String filename = line.substring(5);
         filename.trim();
         load_lua_program(filename.c_str());
+
+    // ============================================================
+    // ★ SCHED コマンド（永続VM＝スケジューラの切り替え専用）
+    //   既存のLOAD/RUN（対話編集用の使い捨てVM）とは別系統
+    //
+    //   SCHED            → 現在アクティブなスケジューラファイル名を表示
+    //   SCHED progA.lua  → 永続VMを破棄・再生成し、progA.luaを即座に有効化
+    //                       成功時は /active_scheduler.txt に選択を記録し、
+    //                       次回起動時も自動的に同じファイルが使われる
+    //
+    //   ※ 稼働中のFT232Hパルスはこの切り替えで中断されない
+    //     （タイマー管理はLua VMと独立したC++オブジェクトのため）
+    // ============================================================
+    } else if (cmd == "SCHED") {
+        Serial.print("Active scheduler: ");
+        Serial.println(get_active_scheduler_filename());
+    } else if (cmd.startsWith("SCHED ")) {
+        String filename = line.substring(6);
+        filename.trim();
+        if (filename.length() == 0) {
+            Serial.println("Usage: SCHED <filename.lua>");
+        } else if (reload_persistent_lua(filename.c_str())) {
+            Serial.print("Ok - scheduler switched to ");
+            Serial.println(filename);
+        } else {
+            Serial.print("Error - failed to load ");
+            Serial.println(filename);
+        }
     } else {
-        // 即時実行モード
+        // 即時実行モード（1行だけのコマンドをその場で実行）
         lua_State *L = luaL_newstate();
         luaL_openlibs(L);
         register_lua_functions(L);

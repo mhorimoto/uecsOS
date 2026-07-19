@@ -20,7 +20,10 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.11" // バージョン番号
+#define VERSION "0.5.14" // バージョン番号
+
+// FT232H実体はlua_hw_usb.cppで定義
+extern FT232H_MPSSE ft232h;
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -28,6 +31,25 @@ unsigned int localPort = 8888;
 EthernetUDP Udp;
 char packetBuffer[1460];
 std::string luaBuffer = "";
+
+// ============================================================
+// UECS標準インターバル・スケジューラ（非ブロッキング）
+//   1sec / 10sec / 1min の3種類
+//   永続Lua VM(g_lua_main)上の exec1sec/exec10sec/exec1min を
+//   それぞれの周期で呼び出す
+// ============================================================
+#define INTERVAL_1SEC_MS   1000UL
+#define INTERVAL_10SEC_MS  10000UL
+#define INTERVAL_1MIN_MS   60000UL
+
+static uint32_t last_1sec_ms  = 0;
+static uint32_t last_10sec_ms = 0;
+static uint32_t last_1min_ms  = 0;
+
+// 起動時の初期化処理で呼ばれるLua program
+#define STARTUP_LUA_FILE "startup.lua"
+// 永続VMが読み込むスケジューラ用Luaファイル
+#define SCHEDULER_LUA_FILE "scheduler.lua"
 
 void setup() {
     uint8_t current_mac[6];
@@ -50,29 +72,61 @@ void setup() {
     // 5. UECSプロトコルスタックの初期化
     init_network_manager(); // 16529ポート開始 ネットワークマネージャーの初期化
     init_uecs_network();    // 16520ポート開始 UECSネットワークの初期化
-    // OS側からSLOT 0番に cnd を初期登録 (type='S', ccmtype="cnd") [cite: 30]
-    set_uecs_slot_internal('S', "cnd", 7, 1, 1, 29, 0,0,0,1);
+
     Serial.println("--- System Ready ---");
     os_booted = true;
 
-    // 6. startup.lua の実行
-    if (SD.exists("startup.lua")) {
-        execute_lua_file("startup.lua");
+    // 6. startup.lua の実行（対話実行用の使い捨てVMで一度だけ流す）
+    if (SD.exists(STARTUP_LUA_FILE)) {
+        execute_lua_file(STARTUP_LUA_FILE);
     } else {
-        Serial.println("No startup.lua found.");
+        Serial.println("No startup found.");
     }
+
+    // 7. スケジューラ専用の永続Lua VMを初期化
+    //    exec1sec/exec10sec/exec1min の関数定義とグローバル変数初期化を
+    //    scheduler.lua から読み込む
+    init_persistent_lua(SCHEDULER_LUA_FILE);
+
+    // インターバル基準時刻を起動時点に合わせる
+    uint32_t now = millis();
+    last_1sec_ms  = now;
+    last_10sec_ms = now;
+    last_1min_ms  = now;
 }
 
 void loop() {
-    extern FT232H_MPSSE ft232h;
     // 1. 1秒ごとにLCDとシリアルに表示
     update_os_display();
     execute_uecs_transmission();
     process_network_manager();
     process_incoming_uecs();
     check_uecs_lifespan();
+
+    // FT232Hの非ブロッキング・パルスタイマー処理
     ft232h.processTimers();
-    // 2. UDPコマンドの待機と実行 (Executer機能)
+
+    // ============================================================
+    // UECS標準インターバル・スケジューラの起動判定（非ブロッキング）
+    //   3つとも独立して判定するため、10secと1minが同時期限でも
+    //   両方とも取りこぼさず実行される
+    // ============================================================
+    uint32_t now = millis();
+
+    if (now - last_1sec_ms >= INTERVAL_1SEC_MS) {
+        last_1sec_ms = now;
+        call_scheduled_function("exec1sec");
+    }
+    if (now - last_10sec_ms >= INTERVAL_10SEC_MS) {
+        last_10sec_ms = now;
+        call_scheduled_function("exec10sec");
+    }
+    if (now - last_1min_ms >= INTERVAL_1MIN_MS) {
+        last_1min_ms = now;
+        call_scheduled_function("exec1min");
+    }
+
+    // 2. UDPコマンドの待機と実行 (Executer機能／対話実行・使い捨てVM)
     int packetSize = Udp.parsePacket();
     if (packetSize) {
         memset(packetBuffer, 0, sizeof(packetBuffer));
@@ -80,7 +134,6 @@ void loop() {
         
         if (len > 0) {
             packetBuffer[len] = '\0';
-            // 【デバッグ追加】受信した生のバイト列を確認
             Serial.print("RAW UDP DATA: ");
             for(int i=0; i<len; i++) {
                 Serial.printf("%02X ", (uint8_t)packetBuffer[i]);
@@ -97,12 +150,9 @@ void loop() {
                 }
             } else {
                 size_t dotPos = line.find_last_of('.');
-                // 終端記号 "." で溜まったバッファを実行
                 if (dotPos != std::string::npos) { 
-                    // ドットより前の部分をすべてバッファに追加
                     luaBuffer += line.substr(0, dotPos);
 
-                    // デバッグ出力：これから実行するコードを「"」で囲って表示
                     Serial.print("Executing Lua: [");
                     Serial.print(luaBuffer.c_str());
                     Serial.println("]");
@@ -111,13 +161,11 @@ void loop() {
                     luaL_openlibs(L);
                     register_lua_functions(L);
                     lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
-                    // 環境変数のセットアップ
                     IPAddress ip = Ethernet.localIP();
                     String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
                     lua_pushstring(L, ipStr.c_str());
                     lua_setglobal(L, "my_ip");
 
-                    // 実行とエラーハンドリング
                     if (luaL_dostring(L, luaBuffer.c_str()) != LUA_OK) {
                         Serial.print("Lua Runtime Error: ");
                         Serial.println(lua_tostring(L, -1));
