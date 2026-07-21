@@ -50,5 +50,5 @@ void save_lua_program(const char* filename);
 void load_lua_program(const char* filename);
 void execute_lua_file(const char* filename);
 void lua_os_hook(lua_State *L, lua_Debug *ar);
-
+void stop_persistent_lua();
 #endif

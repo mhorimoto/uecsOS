@@ -20,7 +20,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.14" // バージョン番号
+#define VERSION "0.5.15" // バージョン番号
 
 // FT232H実体はlua_hw_usb.cppで定義
 extern FT232H_MPSSE ft232h;

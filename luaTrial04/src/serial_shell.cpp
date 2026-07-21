@@ -4,6 +4,9 @@
 #include <string>
 #include "lua_functions.h"
 #include "lua_executor.h"
+#include "USB_FT232H_MPSSE.h"
+
+extern FT232H_MPSSE ft232h;
 
 static void handle_serial_input(String line) {
     line.trim();
@@ -101,6 +104,10 @@ static void handle_serial_input(String line) {
     } else if (cmd == "SCHED") {
         Serial.print("Active scheduler: ");
         Serial.println(get_active_scheduler_filename());
+    } else if (cmd == "SCHED STOP") {          // ★ こちらを先に判定
+        stop_persistent_lua();
+        ft232h.allOff();
+        Serial.println("Ok - all relays forced OFF");
     } else if (cmd.startsWith("SCHED ")) {
         String filename = line.substring(6);
         filename.trim();

@@ -183,6 +183,19 @@ void call_scheduled_function(const char* fname) {
         //   止めないため（次回の呼び出しでまた挑戦する）
     }
 }
+// ============================================================
+// 永続VMの明示的停止（SCHED STOPコマンド等から呼ぶ）
+//   新規のexec1sec/10sec/1min呼び出しを完全に止める
+//   ※ 既に物理出力がONになっている場合、それ自体は変化しない
+//     （呼び出し側でallOff()等と組み合わせること）
+// ============================================================
+void stop_persistent_lua() {
+    if (g_lua_main != nullptr) {
+        lua_close(g_lua_main);
+        g_lua_main = nullptr;
+        Serial.println("[Lua Persistent] Stopped.");
+    }
+}
 
 // --- Luaファイル実行部（対話実行・使い捨てVM／従来のまま） ---
 void execute_lua_file(const char* filename) {
