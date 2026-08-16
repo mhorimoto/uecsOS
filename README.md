@@ -1,40 +1,75 @@
-# uecsOS 開発リファレンス：Teensy 4.1 ベースの次世代制御ノード
-## 1. プロジェクトの背景と目的
-* 研究背景: 九州大学大学院農学研究院におけるスマート農業研究．
-* 目的: 農業情報標準規格「UECS（Ubiquitous Environment Control System）」に準拠し，エンドユーザー（農家）が自ら制御ロジックを構築できる「ノーコード環境制御システム」の構築．
-* 基本コンセプト: 堅牢な「C++ OS層」と柔軟な「スクリプト・ロジック層」の分離．
+# 試験用Luaコード
 
-![コンセプトイメージ](uecsOS_Design_Concept_of_Next-Generation_Control_Node_for_SmartAgriculture.png)
+LuaコードによるM304Nの制御を試験するための代表的なコード
 
-## 2. ハードウェア・スタック
-* コアマイコン: Teensy 4.1 (Cortex-M7, 600MHz, RAM 1MB, Flash 8MB)．
-* ネットワーク: Native Ethernet (i.MX RT1062内蔵PHY) を使用．
-* 物理制御インターフェース:
-  * Teensy 4.1 のUSBホストポートを活用．
-  * FT232H をUSB接続し，BitBangモード（GPIO）を介してリレーを駆動．
-  * 本体GPIOの保護と絶縁，および将来的なUSBハブによる拡張性を担保．
+* BLD:0.3.12以降を推奨
+* IPアドレスを指定して8888/udpでLuaコードをコマンドとして送り込む
 
-## 3. ソフトウェア・アーキテクチャ
-* L1: OS層 (C++, PlatformIO):
-  * UECSスタック: UDPパケット（XML）のパース（ROOM/REGION/CCMTYPE分類），最新環境値テーブルの管理，1秒/10秒/1分周期の自律伝送．
-  * 通信管理: DHCPによるIP取得，UDPによる新規ロジック受信（GUIからの転送）．
-  * デバイス管理: USBホスト監視，FT232H制御コマンドの発行．
-  * セーフティ機能: ウォッチドッグタイマーによるロジック監視，緊急停止処理．
-* L2: ロジック層 (スクリプト言語インタプリタ):
-  * Blocklyから生成された中間言語を実行．
-  * OS層が提供するAPI（GET_TEMP() や SET_RELAY()）を叩くことで物理制御を実現．
-* L3: UI層 (Google Blockly):
-  * Scratch風のビジュアルエディタ．
-  * Webブラウザ上で動作し，中間言語（LuaまたはBASIC）を生成・UDP送信する．
+## System関連
 
-## 4. 技術的葛藤と選定（言語選定のRationale）
-本プロジェクトでは，リソース制約と表現力のトレードオフについて深い検討を行った．
+## lcd関連
+LCD画面の表示機能に関するLuaのテスト  
+lcd. を前置します。
 
-* 初期案 (MY-BASIC): 極めて軽量（RAM 10KB〜）だが，データ構造が単純．
-* 検討案 (Lua): RAM消費は増える（100KB〜）が，「テーブル（連想配列）」という強力なデータ構造を持つ．
-* 設計判断: Teensy 4.1の潤沢なリソース（1MB RAM）を背景に，UECSの構造化データ（複雑な環境条件やルール）を直感的に扱えるLuaを優先検討．Blocklyからのコード生成が容易である点も重視．
+### init()
+初期化する関数。Lua側からはめったに呼ばれることはない。
 
-## 5. 実装ノウハウ・断片
-* 通信プロトコル: GUIからTeensyへのロジック転送にはUDPを使用．受信したコードはRAM上で実行し，永続化のためにSDカードへ保存する．
-* 多系統制御の仲裁: UECS電文や外部AIからの指示を「即時実行タスク」として定義．ユーザーロジックとの競合解決（仲裁ロジック）をOS層で実装する．
-* 開発環境: VS Code + PlatformIO．NativeEthernetおよびUSBHost_t36ライブラリを使用．
+### print()
+文字列を表示する。  
+```Lua
+lcd.print("ABC TEST");
+```
+```sh
+printf "lcd.print(\"uecs\")." | nc -u -w1  [IP Address] 8888
+```
+### clear()
+全表示を消去する。
+```Lua
+lcd.clear();
+```
+```sh
+printf "lcd.clear()." | nc -u -w1 [IP Address] 8888
+```
+### setCursor(x,y)
+カーソルの位置を指定する。  
+画面左上は(0,0)。
+
+* x=0..19
+* y=0..3
+
+カーソル位置を移動してから、文字を表示する場合。
+
+```Lua
+lcd.setCursor(5,2);
+lcd.print("IP Address");
+```
+```sh
+printf "lcd.setCursor(5,2);\n lcd.print(\"IP Address\");" | nc -u -w1 [IP Address] 8888
+```
+
+## SD関連
+
+## USB関連
+
+## UECS関連
+
+## 応用編
+
+### シリアルにメッセージを出力してリセットする
+```Lua
+print("reset from Lua");
+reset();
+```
+```sh
+printf "print(\"reset from Lua\"); reset()." | nc -u -w1  [IP Address] 8888
+```
+### timeをLCDの左上に表示する
+```Lua
+lcd.clear();
+a=uecs.time();
+lcd.print(a);
+```
+```sh
+printf "lcd.clear(); a=uecs.time(); lcd.print(a)." | nc -u -w1  [IP Address] 8888
+```
+

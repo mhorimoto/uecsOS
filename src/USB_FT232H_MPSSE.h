@@ -21,6 +21,9 @@ public:
     FT232H_MPSSE(USBHost &host);
 
     bool isReady() { return device_ready; }
+    // USB_FT232H_MPSSE.h の public: セクションに追記
+    uint16_t getVID() { return (claimed_dev != nullptr) ? claimed_dev->idVendor : 0; }
+    uint16_t getPID() { return (claimed_dev != nullptr) ? claimed_dev->idProduct : 0; }
 
     // バイト単位の直接書き込み
     void setADBUS(uint8_t value);
