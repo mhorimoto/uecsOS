@@ -10,9 +10,6 @@ extern void process_network_manager();
 extern void process_incoming_uecs();
 extern void check_uecs_lifespan();
 
-// lua_hw_usb.cpp で定義されているFT232Hインスタンスの外部参照
-extern FT232H_MPSSE ft232h;
-
 // プログラム保持用のマップの実体（対話編集用・従来のまま）
 std::map<int, std::string> lua_program;
 
@@ -31,8 +28,6 @@ static String g_active_scheduler_filename = "";
 // --- 究極の要塞化：Lua強制フック関数 ---
 // 対話実行用の一時VMと、永続VM（スケジューラ）の両方に設定される
 void lua_os_hook(lua_State *L, lua_Debug *ar) {
-    update_os_display();  // LCD表示の更新を強制的に行う
-    
     // --- 緊急停止（Halt）シグナルの監視 ---
     while (Serial.available() > 0) {
         char c = Serial.read();
@@ -41,16 +36,6 @@ void lua_os_hook(lua_State *L, lua_Debug *ar) {
             luaL_error(L, "Script halted by OS Interrupt"); 
         }
     }
-    
-    // ネットワークエンジンを強制駆動
-    execute_uecs_transmission();
-    process_network_manager();
-    process_incoming_uecs();
-    check_uecs_lifespan();
-
-    // リレー・タイマー処理を強制駆動
-    ft232h.processTimers();
-    
     yield(); 
 }
 

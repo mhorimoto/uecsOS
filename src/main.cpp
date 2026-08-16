@@ -20,10 +20,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.16" // バージョン番号
-
-// FT232H実体はlua_hw_usb.cppで定義
-extern FT232H_MPSSE ft232h;
+#define VERSION "0.5.21" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -95,16 +92,48 @@ void setup() {
     last_1min_ms  = now;
 }
 
-void loop() {
-    // 1. 1秒ごとにLCDとシリアルに表示
-    update_os_display();
-    execute_uecs_transmission();
-    process_network_manager();
-    process_incoming_uecs();
-    check_uecs_lifespan();
+// ============================================================
+// Teensy標準の yield() をオーバーライド（OSの完全な非ブロッキング化）
+// ============================================================
+void yield() {
+    #define SCB_ICSR_VECTACTIVE 0x000001FF
+    // 【最重要の防御壁】
+    // ARM Cortex-M の割り込みステータスを直接確認し、
+    // 割り込み処理(ISR)の中から呼ばれた場合は即座にリターンする（クラッシュ防止）
+    if (SCB_ICSR & SCB_ICSR_VECTACTIVE) return;
 
-    // FT232Hの非ブロッキング・パルスタイマー処理
-    ft232h.processTimers();
+    // 再帰呼び出し防止
+    static bool in_yield = false;
+    if (in_yield) return;
+    in_yield = true;
+
+    if (os_booted) {
+        // USBコアのタスク処理
+        myusb.Task();
+
+        // 10ms (100Hz) スロットリング
+        static uint32_t last_yield_ms = 0;
+        uint32_t now = millis();
+        if (now - last_yield_ms >= 10) { 
+            last_yield_ms = now;
+            
+            update_os_display();
+            execute_uecs_transmission();
+            process_network_manager();
+            process_incoming_uecs();
+            check_uecs_lifespan();
+
+            for (int i = 0; i < MAX_FT232H_DEVICES; i++) {
+                if (ft_devices[i]) ft_devices[i]->processTimers();
+            }
+        }
+    }
+    in_yield = false;
+}
+
+void loop() {
+    // 1. バックグラウンドタスク（USB, LCD, ネットワーク等）の実行
+    yield();
 
     // ============================================================
     // UECS標準インターバル・スケジューラの起動判定（非ブロッキング）

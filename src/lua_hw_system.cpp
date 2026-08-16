@@ -5,7 +5,7 @@
 #include "network_manager.h"
 #include "libuecs.h"
 
-#define LUA_HW_SYSTEM_VERSION "0.0.4"
+#define LUA_HW_SYSTEM_VERSION "0.0.5"
 
 extern "C" {
     int l_my_print(lua_State *L) {
@@ -51,22 +51,17 @@ extern "C" {
 
     int l_delay(lua_State *L) {
         uint32_t ms = (uint32_t)luaL_checkinteger(L, 1);
-        uint32_t start = millis();
-    
-        while (millis() - start < ms) {
-            // ここでOSのバックグラウンドタスク(UECS通信など)を処理
-            // process_network_manager();
-            // execute_uecs_transmission();
         
-            // --- ブレイク信号(Ctrl+C または ESC)の監視を追加 ---
-            if (Serial.available()) {
-                char c = Serial.read();
-                if (c == 0x03 || c == 0x1B) { // 0x03: Ctrl+C, 0x1B: ESC
-                    // Lua VMに対して即座にエラーを発生させ、スクリプト実行を強制終了
-                    return luaL_error(L, "Interrupted by User (Ctrl+C / ESC)");
-                }
+        // Teensy標準の delay() にすべてを任せる
+        // この中で自動的に main.cpp の yield() が高速で呼ばれ続けます
+        delay(ms);        
+        // --- ブレイク信号(Ctrl+C または ESC)の監視を追加 ---
+        if (Serial.available()) {
+            char c = Serial.read();
+            if (c == 0x03 || c == 0x1B) { // 0x03: Ctrl+C, 0x1B: ESC
+                // Lua VMに対して即座にエラーを発生させ、スクリプト実行を強制終了
+                return luaL_error(L, "Interrupted by User (Ctrl+C / ESC)");
             }
-            yield(); // Teensyの内部タスクに時間を譲る
         }
         return 0;
     }

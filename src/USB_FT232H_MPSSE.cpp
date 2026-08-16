@@ -194,7 +194,7 @@ void FT232H_MPSSE::control(const Transfer_t *transfer) {
     case 2:
         Serial.println("[FT232H] MPSSE Init complete! Device ready.");
         device_ready = true;
-        delay(10);
+        delayMicroseconds(10000); // 10ms
         allOff();
         break;
     }

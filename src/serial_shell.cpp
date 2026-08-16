@@ -6,8 +6,6 @@
 #include "lua_executor.h"
 #include "USB_FT232H_MPSSE.h"
 
-extern FT232H_MPSSE ft232h;
-
 static void handle_serial_input(String line) {
     line.trim();
     if (line.length() == 0) return;
@@ -106,7 +104,12 @@ static void handle_serial_input(String line) {
         Serial.println(get_active_scheduler_filename());
     } else if (cmd == "SCHED STOP") {          // ★ こちらを先に判定
         stop_persistent_lua();
-        ft232h.allOff();
+        // 全デバイスの出力を安全にOFF
+        for (int i = 0; i < MAX_FT232H_DEVICES; i++) {
+            if (ft_devices[i]->isReady()) {
+                ft_devices[i]->allOff();
+            }
+        }
         Serial.println("Ok - all relays forced OFF");
     } else if (cmd.startsWith("SCHED ")) {
         String filename = line.substring(6);
