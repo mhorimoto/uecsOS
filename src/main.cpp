@@ -20,7 +20,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.21" // バージョン番号
+#define VERSION "0.5.24" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -69,6 +69,8 @@ void setup() {
     // 5. UECSプロトコルスタックの初期化
     init_network_manager(); // 16529ポート開始 ネットワークマネージャーの初期化
     init_uecs_network();    // 16520ポート開始 UECSネットワークの初期化
+    // USBホストをOS起動時に確実に1度だけ初期化する
+    myusb.begin();
 
     Serial.println("--- System Ready ---");
     os_booted = true;
@@ -110,23 +112,6 @@ void yield() {
     if (os_booted) {
         // USBコアのタスク処理
         myusb.Task();
-
-        // 10ms (100Hz) スロットリング
-        static uint32_t last_yield_ms = 0;
-        uint32_t now = millis();
-        if (now - last_yield_ms >= 10) { 
-            last_yield_ms = now;
-            
-            update_os_display();
-            execute_uecs_transmission();
-            process_network_manager();
-            process_incoming_uecs();
-            check_uecs_lifespan();
-
-            for (int i = 0; i < MAX_FT232H_DEVICES; i++) {
-                if (ft_devices[i]) ft_devices[i]->processTimers();
-            }
-        }
     }
     in_yield = false;
 }
@@ -134,13 +119,27 @@ void yield() {
 void loop() {
     // 1. バックグラウンドタスク（USB, LCD, ネットワーク等）の実行
     yield();
+    // 重い処理は 10ms(100Hz) に1回に間引く（I2Cフリーズ・暴走防止）
+    static uint32_t last_heavy_task_ms = 0;
+    uint32_t now = millis();
+    if (now - last_heavy_task_ms >= 10) {
+        last_heavy_task_ms = now;
+        update_os_display();
+        execute_uecs_transmission();
+        process_network_manager();
+        process_incoming_uecs();
+        check_uecs_lifespan();
+        for (int i = 0; i < MAX_FT232H_DEVICES; i++) {
+            if (ft_devices[i]) ft_devices[i]->processTimers();
+        }
+    }
 
     // ============================================================
     // UECS標準インターバル・スケジューラの起動判定（非ブロッキング）
     //   3つとも独立して判定するため、10secと1minが同時期限でも
     //   両方とも取りこぼさず実行される
     // ============================================================
-    uint32_t now = millis();
+    now = millis();
 
     if (now - last_1sec_ms >= INTERVAL_1SEC_MS) {
         last_1sec_ms = now;

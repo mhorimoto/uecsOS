@@ -4,7 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define LUA_HW_USB_VERSION "0.0.7"
+#define LUA_HW_USB_VERSION "0.0.8"
 
 // 同時接続を許可するFT232Hの最大台数 (5台で80個リレーを制御可能)
 #define MAX_FT232H_DEVICES 5
@@ -42,7 +42,6 @@ extern "C" {
 
     // USBホストコアの起動
     int l_usb_begin(lua_State *L) {
-        myusb.begin();
         lua_pushboolean(L, true);
         return 1;
     }
@@ -136,26 +135,8 @@ extern "C" {
         return 1;
     }
 
-    // 関数テーブルの登録
-    static const struct luaL_Reg usb_funcs[] = {
-        {"begin", l_usb_begin},
-        {"write", l_usb_write},
-        {"read",  l_usb_read},
-        {"power", l_usb_power},
-        {"isConnected", l_usb_isConnected},
-        {"ft_pin", l_usb_ft_pin},
-        {"ft_write_all", l_usb_ft_write_all},
-        {NULL, NULL}
-    };
-
-    int luaopen_usb(lua_State *L) {
-        luaL_newlib(L, usb_funcs);
-        return 1;
-    }
-// lua_hw_usb.cpp の extern "C" {} 内に追記
-
     // ============================================================
-    // 【新規】USBデバイスの接続情報をLuaのテーブルとして返す
+    // USBデバイスの接続情報をLuaのテーブルとして返す
     // Lua戻り値: { {id=0, ready=true, vid=1027, pid=24596}, ... }
     // ============================================================
     int l_usb_info(lua_State *L) {
@@ -190,6 +171,23 @@ extern "C" {
             // 子テーブルを全体テーブルにセット
             lua_settable(L, -3); 
         }
+        return 1;
+    }
+
+    // 関数テーブルの登録
+    static const struct luaL_Reg usb_funcs[] = {
+        {"begin", l_usb_begin},
+        {"write", l_usb_write},
+        {"read",  l_usb_read},
+        {"power", l_usb_power},
+        {"isConnected", l_usb_isConnected},
+        {"ft_pin", l_usb_ft_pin},
+        {"ft_write_all", l_usb_ft_write_all},
+        {"info", l_usb_info},
+        {NULL, NULL}
+    };
+    int luaopen_usb(lua_State *L) {
+        luaL_newlib(L, usb_funcs);
         return 1;
     }
 }
