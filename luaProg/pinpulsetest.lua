@@ -1,0 +1,5 @@
+usb.ft_pin_pulse("d0",1000)
+usb.ft_pin_pulse("d1",2000)
+usb.ft_pin_pulse("d2",3000)
+usb.ft_pin_pulse("d3",4000)
+usb.ft_pin_pulse("d4",5000)

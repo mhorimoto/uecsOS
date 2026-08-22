@@ -28,6 +28,22 @@ public:
     // USB_FT232H_MPSSE.h の public: セクションに追記
     uint16_t getVID() { return (claimed_dev != nullptr) ? claimed_dev->idVendor : 0; }
     uint16_t getPID() { return (claimed_dev != nullptr) ? claimed_dev->idProduct : 0; }
+    String getSerial() {
+        const uint8_t *sn = serialNumber();
+        return (sn != nullptr && sn[0] != '\0') ? String((const char*)sn) : String("EMPTY");
+    }
+    String getManufacturer() {
+        const uint8_t *mfg = manufacturer();
+        return (mfg != nullptr && mfg[0] != '\0') ? String((const char*)mfg) : String("EMPTY");
+    }
+    String getProduct() {
+        const uint8_t *prd = product();
+        return (prd != nullptr && prd[0] != '\0') ? String((const char*)prd) : String("EMPTY");
+    }
+    // 物理接続トポロジ（ポート位置）の取得
+    uint8_t getAddress() { return (claimed_dev != nullptr) ? claimed_dev->address : 0; }
+    uint8_t getHubAddress() { return (claimed_dev != nullptr) ? claimed_dev->hub_address : 0; }
+    uint8_t getHubPort() { return (claimed_dev != nullptr) ? claimed_dev->hub_port : 0; }
 
     // バイト単位の直接書き込み
     void setADBUS(uint8_t value);
@@ -57,7 +73,7 @@ protected:
 private:
     Pipe_t     mypipes[5]      __attribute__((aligned(32)));
     Transfer_t mytransfers[24] __attribute__((aligned(32)));
-    strbuf_t   mystring_bufs[2];
+    strbuf_t   mystring_bufs[3];
     setup_t    setup_pkt;
     Pipe_t    *bulk_in;
     Pipe_t    *bulk_out;

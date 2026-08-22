@@ -5,7 +5,8 @@
 #include "network_manager.h"
 #include "libuecs.h"
 
-#define LUA_HW_SYSTEM_VERSION "0.0.5"
+#define LUA_HW_SYSTEM_VERSION "0.0.6"
+extern void run_os_background_tasks();
 
 extern "C" {
     int l_my_print(lua_State *L) {
@@ -51,16 +52,19 @@ extern "C" {
 
     int l_delay(lua_State *L) {
         uint32_t ms = (uint32_t)luaL_checkinteger(L, 1);
+        uint32_t start = millis();
         
-        // Teensy標準の delay() にすべてを任せる
-        // この中で自動的に main.cpp の yield() が高速で呼ばれ続けます
-        delay(ms);        
-        // --- ブレイク信号(Ctrl+C または ESC)の監視を追加 ---
-        if (Serial.available()) {
-            char c = Serial.read();
-            if (c == 0x03 || c == 0x1B) { // 0x03: Ctrl+C, 0x1B: ESC
-                // Lua VMに対して即座にエラーを発生させ、スクリプト実行を強制終了
-                return luaL_error(L, "Interrupted by User (Ctrl+C / ESC)");
+        // 【修正】自前の待機ループ内でOSタスクを明示的に回す
+        while (millis() - start < ms) {
+            yield();                    // USBの維持
+            run_os_background_tasks();  // LCD・ネットワークの維持
+
+            // --- ブレイク信号(Ctrl+C または ESC)の監視 ---
+            if (Serial.available()) {
+                char c = Serial.read();
+                if (c == 0x03 || c == 0x1B) { 
+                    return luaL_error(L, "Interrupted by User (Ctrl+C / ESC)");
+                }
             }
         }
         return 0;

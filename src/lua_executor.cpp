@@ -9,6 +9,7 @@ extern void execute_uecs_transmission();
 extern void process_network_manager();
 extern void process_incoming_uecs();
 extern void check_uecs_lifespan();
+extern void run_os_background_tasks();
 
 // プログラム保持用のマップの実体（対話編集用・従来のまま）
 std::map<int, std::string> lua_program;
@@ -36,7 +37,8 @@ void lua_os_hook(lua_State *L, lua_Debug *ar) {
             luaL_error(L, "Script halted by OS Interrupt"); 
         }
     }
-    yield(); 
+    yield();
+    run_os_background_tasks();
 }
 
 // ============================================================

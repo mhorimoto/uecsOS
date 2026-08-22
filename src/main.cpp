@@ -14,13 +14,13 @@
 #include "lua_functions.h"
 #include "libuecs.h"
 #include "USB_FT232H_MPSSE.h"
-
+#include <MTP_Teensy.h>
 
 #define LC_SEQ          0x70 // 4 bytes (unsigned long)
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.24" // バージョン番号
+#define VERSION "0.5.29" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -59,6 +59,10 @@ void setup() {
     Serial.println("uecsOS Starting ... BLD: " VERSION);
     // 2. ストレージ(SDカードとEEPROM設定)初期化
     init_system_sd();
+    // MTPの初期化 (必ずSDカード初期化の直後に呼ぶ)
+    MTP.begin();
+    MTP.addFilesystem(SD, "uecsOS_SD"); // PC上で表示されるドライブ名
+    Serial.println("MTP Initialized.");
     // 3. ネットワーク初期化
     init_system_network();
     // 4. 内部RTC同期設定
@@ -99,27 +103,26 @@ void setup() {
 // ============================================================
 void yield() {
     #define SCB_ICSR_VECTACTIVE 0x000001FF
-    // 【最重要の防御壁】
     // ARM Cortex-M の割り込みステータスを直接確認し、
     // 割り込み処理(ISR)の中から呼ばれた場合は即座にリターンする（クラッシュ防止）
     if (SCB_ICSR & SCB_ICSR_VECTACTIVE) return;
-
     // 再帰呼び出し防止
     static bool in_yield = false;
     if (in_yield) return;
     in_yield = true;
-
     if (os_booted) {
         // USBコアのタスク処理
         myusb.Task();
+        // USBデバイスタスク (PCとのMTP通信用)
+        MTP.loop();
     }
     in_yield = false;
 }
 
-void loop() {
-    // 1. バックグラウンドタスク（USB, LCD, ネットワーク等）の実行
-    yield();
-    // 重い処理は 10ms(100Hz) に1回に間引く（I2Cフリーズ・暴走防止）
+// ============================================================
+// OSのバックグラウンドタスク（LCD, ネットワーク等）
+// ============================================================
+void run_os_background_tasks() {
     static uint32_t last_heavy_task_ms = 0;
     uint32_t now = millis();
     if (now - last_heavy_task_ms >= 10) {
@@ -133,13 +136,17 @@ void loop() {
             if (ft_devices[i]) ft_devices[i]->processTimers();
         }
     }
+}
 
-    // ============================================================
+void loop() {
+    // 1. バックグラウンドタスク（USB, LCD, ネットワーク等）の実行
+    yield();
+    run_os_background_tasks();
+
     // UECS標準インターバル・スケジューラの起動判定（非ブロッキング）
     //   3つとも独立して判定するため、10secと1minが同時期限でも
     //   両方とも取りこぼさず実行される
-    // ============================================================
-    now = millis();
+    uint32_t now = millis();
 
     if (now - last_1sec_ms >= INTERVAL_1SEC_MS) {
         last_1sec_ms = now;

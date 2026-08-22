@@ -4,7 +4,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define LUA_HW_USB_VERSION "0.0.8"
+#define LUA_HW_USB_VERSION "0.0.9"
 
 // 同時接続を許可するFT232Hの最大台数 (5台で80個リレーを制御可能)
 #define MAX_FT232H_DEVICES 5
@@ -57,7 +57,7 @@ extern "C" {
     }
 
     // ============================================================
-    // 【変更】接続状態の確認（引数でデバイスIDを指定。省略時は0）
+    // 接続状態の確認（引数でデバイスIDを指定。省略時は0）
     // Lua引数: (0) または 省略
     // ============================================================
     int l_usb_isConnected(lua_State *L) {
@@ -73,7 +73,7 @@ extern "C" {
     }
 
     // ============================================================
-    // 【変更】FT232H ピン単位のON/OFF
+    // FT232H ピン単位のON/OFF
     // Lua引数: (デバイスID, "d0", true) 
     // ============================================================
     int l_usb_ft_pin(lua_State *L) {
@@ -113,7 +113,7 @@ extern "C" {
     }
 
     // ============================================================
-    // 【変更】FT232H 全ピンの一括制御
+    // FT232H 全ピンの一括制御
     // Lua引数: (デバイスID, 0x00, 0xFF)
     // ============================================================
     int l_usb_ft_write_all(lua_State *L) {
@@ -167,7 +167,35 @@ extern "C" {
             lua_pushstring(L, "pid");
             lua_pushinteger(L, ft_devices[i]->getPID());
             lua_settable(L, -3);
+
+            // Manufacturer
+            lua_pushstring(L, "mfg");
+            lua_pushstring(L, ft_devices[i]->getManufacturer().c_str());
+            lua_settable(L, -3);
+
+            // Product
+            lua_pushstring(L, "product");
+            lua_pushstring(L, ft_devices[i]->getProduct().c_str());
+            lua_settable(L, -3);
+
+            // Serial Number (シリアル文字列)
+            lua_pushstring(L, "serial");
+            lua_pushstring(L, ft_devices[i]->getSerial().c_str());
+            lua_settable(L, -3);
+
+            // 物理接続トポロジ情報
+            lua_pushstring(L, "address");
+            lua_pushinteger(L, ft_devices[i]->getAddress());
+            lua_settable(L, -3);
             
+            lua_pushstring(L, "hub_addr");
+            lua_pushinteger(L, ft_devices[i]->getHubAddress());
+            lua_settable(L, -3);
+            
+            lua_pushstring(L, "hub_port");
+            lua_pushinteger(L, ft_devices[i]->getHubPort());
+            lua_settable(L, -3);
+
             // 子テーブルを全体テーブルにセット
             lua_settable(L, -3); 
         }
