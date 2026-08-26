@@ -8,6 +8,11 @@ FT232H_MPSSE::FT232H_MPSSE(USBHost &host)
     for (int i = 0; i < FT_TIMED_RELAY_MAX; i++) {
         _timers[i].active = false;
     }
+    // トポロジ記録用マップの初期化
+    for (int i = 0; i < 128; i++) {
+        topo_hub_addr[i] = 0;
+        topo_hub_port[i] = 0;
+    }
     init();
 }
 
@@ -45,6 +50,39 @@ void FT232H_MPSSE::setAll(uint8_t adbus_val, uint8_t acbus_val) {
 
 void FT232H_MPSSE::allOff() { setAll(0xFF, 0xFF); }
 void FT232H_MPSSE::allOn()  { setAll(0x00, 0x00); }
+
+// ============================================================
+// 物理トポロジ・パスの取得
+// ============================================================
+String FT232H_MPSSE::getTopologyPath() {
+    // デバイスが未接続・未列挙の場合は処理しない
+    if (claimed_dev == nullptr) {
+        return "Disconnected";
+    }
+
+    // 1. カレントデバイス（FT232H）が接続されているポート番号からスタート
+    String path = String(claimed_dev->hub_port);
+    uint8_t current_parent_addr = claimed_dev->hub_address;
+    // 2. マップを逆引きして親のハブアドレスが0（Root）になるまで辿る
+    int depth = 0; // 無限ループ防止用の安全策
+    while (current_parent_addr != 0 && depth < 10) {
+        uint8_t p_addr = topo_hub_addr[current_parent_addr];
+        uint8_t p_port = topo_hub_port[current_parent_addr];
+
+        // 万が一親ツリーが見つからなかった場合のフェイルセーフ
+        if (p_port == 0 && current_parent_addr != 0) {
+            path = "?-" + path;
+            break;
+        }
+        // 親ハブが見つかったら，そのハブ自身が刺さっているポート番号を前方に結合
+        path = String(p_port) + "-" + path;
+        
+        // さらに上の親ハブのアドレスへ更新
+        current_parent_addr = p_addr;
+        depth++;
+    }
+    return "Root-" + path;
+}
 
 // ============================================================
 // ビット単位の書き込み
@@ -135,6 +173,11 @@ void FT232H_MPSSE::bulk_write(const uint8_t *data, uint32_t len) {
 }
 
 bool FT232H_MPSSE::claim(Device_t *dev, int type, const uint8_t *descriptors, uint32_t len) {
+    // 列挙された全デバイスの親ハブ情報を密かに記録しておく
+    if (dev != nullptr && dev->address < 128) {
+        topo_hub_addr[dev->address] = dev->hub_address;
+        topo_hub_port[dev->address] = dev->hub_port;
+    }
     if (type == 0) {
         if (dev->idVendor != 0x0403 || dev->idProduct != 0x6014) return false;
         Serial.println("[FT232H] Device matched (type=0), waiting for interface...");

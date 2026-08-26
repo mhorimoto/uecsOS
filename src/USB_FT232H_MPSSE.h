@@ -44,6 +44,8 @@ public:
     uint8_t getAddress() { return (claimed_dev != nullptr) ? claimed_dev->address : 0; }
     uint8_t getHubAddress() { return (claimed_dev != nullptr) ? claimed_dev->hub_address : 0; }
     uint8_t getHubPort() { return (claimed_dev != nullptr) ? claimed_dev->hub_port : 0; }
+    // 完全な物理トポロジ・パスの取得
+    String getTopologyPath();
 
     // バイト単位の直接書き込み
     void setADBUS(uint8_t value);
@@ -88,6 +90,9 @@ private:
 
     // タイマースロット
     FT_TimedRelay _timers[FT_TIMED_RELAY_MAX];
+    // システム上の全USBデバイスのトポロジ記録用マップ
+    uint8_t    topo_hub_addr[128];
+    uint8_t    topo_hub_port[128];
 
     void init();
     void bulk_write(const uint8_t *data, uint32_t len);
