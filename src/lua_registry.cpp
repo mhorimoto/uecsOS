@@ -1,5 +1,8 @@
 #include "lua_functions.h"
-#define LUA_REGISTRY_VERSION "0.0.3"
+#define LUA_REGISTRY_VERSION "0.0.4"
+
+// 【追記1】lua_executor.cpp で定義した登録関数を外部参照
+extern void register_lua_usb_topology(lua_State *L);
 
 extern "C" {
     int luaopen_uecs(lua_State *L);
@@ -51,5 +54,6 @@ void register_lua_functions(lua_State *L) {
     reg_glob("usb_begin", l_usb_begin);
     reg_glob("usb_write", l_usb_write);
     reg_glob("usb_read", l_usb_read);
-
+    // 【追記2】大元の登録処理にトポロジ関数も相乗りさせる
+    register_lua_usb_topology(L);
 }

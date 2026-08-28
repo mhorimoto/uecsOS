@@ -1,5 +1,9 @@
 #include "USB_FT232H_MPSSE.h"
 
+// 【追記】static配列の実体定義と初期化
+uint8_t FT232H_MPSSE::topo_hub_addr[128] = {0};
+uint8_t FT232H_MPSSE::topo_hub_port[128] = {0};
+
 FT232H_MPSSE::FT232H_MPSSE(USBHost &host)
     : USBDriver(), bulk_in(nullptr), bulk_out(nullptr),
       device_ready(false), init_phase(0), claimed_dev(nullptr),
@@ -55,34 +59,34 @@ void FT232H_MPSSE::allOn()  { setAll(0x00, 0x00); }
 // 物理トポロジ・パスの取得
 // ============================================================
 String FT232H_MPSSE::getTopologyPath() {
-    // デバイスが未接続・未列挙の場合は処理しない
-    if (claimed_dev == nullptr) {
+    // ★修正1: 通信準備が完了していないインスタンス（誤認識スロット）は弾く
+    if (!device_ready || claimed_dev == nullptr) {
         return "Disconnected";
     }
 
-    // 1. カレントデバイス（FT232H）が接続されているポート番号からスタート
     String path = String(claimed_dev->hub_port);
     uint8_t current_parent_addr = claimed_dev->hub_address;
-    // 2. マップを逆引きして親のハブアドレスが0（Root）になるまで辿る
-    int depth = 0; // 無限ループ防止用の安全策
+    int depth = 0; // 無限ループ防止
+
     while (current_parent_addr != 0 && depth < 10) {
         uint8_t p_addr = topo_hub_addr[current_parent_addr];
         uint8_t p_port = topo_hub_port[current_parent_addr];
 
-        // 万が一親ツリーが見つからなかった場合のフェイルセーフ
-        if (p_port == 0 && current_parent_addr != 0) {
-            path = "?-" + path;
+        if (p_port == 0) {
+            // ★修正2: USBHubドライバに先取りされてキャッシュが漏れた場合のフォールバック
+            // 親ハブの「物理ポート」が不明な場合は「ハブのアドレス(ID)」で代用し、一意性を保つ
+            path = "Hub(" + String(current_parent_addr) + ")-" + path;
             break;
         }
-        // 親ハブが見つかったら，そのハブ自身が刺さっているポート番号を前方に結合
+
         path = String(p_port) + "-" + path;
-        
-        // さらに上の親ハブのアドレスへ更新
         current_parent_addr = p_addr;
         depth++;
     }
+
     return "Root-" + path;
 }
+
 
 // ============================================================
 // ビット単位の書き込み
@@ -178,16 +182,24 @@ bool FT232H_MPSSE::claim(Device_t *dev, int type, const uint8_t *descriptors, ui
         topo_hub_addr[dev->address] = dev->hub_address;
         topo_hub_port[dev->address] = dev->hub_port;
     }
+
+    // ★追加1: 自分がすでに他のデバイスを制御中(使用中)なら、この列挙処理を無視して他のインスタンスに譲る
+    if (claimed_dev != nullptr) {
+        return false;
+    }
+
     if (type == 0) {
         if (dev->idVendor != 0x0403 || dev->idProduct != 0x6014) return false;
-        Serial.println("[FT232H] Device matched (type=0), waiting for interface...");
-        claimed_dev = dev;
+        // ★追加2: チャタリングによるログスパムを防ぐため、type=0 の段階ではログを出さずに静かに通過させる
         return false;
     }
 
     if (type == 1) {
         if (dev->idVendor != 0x0403 || dev->idProduct != 0x6014) return false;
-        Serial.println("[FT232H] Interface claim (type=1)");
+        
+        // 前回切断時のパイプ情報が残っていれば念のためクリア
+        bulk_in = nullptr;
+        bulk_out = nullptr;
 
         const uint8_t *p   = descriptors;
         const uint8_t *end = descriptors + len;
@@ -211,6 +223,13 @@ bool FT232H_MPSSE::claim(Device_t *dev, int type, const uint8_t *descriptors, ui
         }
 
         if (bulk_in && bulk_out) {
+            claimed_dev = dev; // 通信準備が完全に整った「この瞬間」にだけデバイスを紐付ける
+            
+            // ★追加3: 接点が安定し、完全に接続を確立できたときだけログを出す
+            Serial.print("[FT232H] Interface claimed. Starting MPSSE config... (");
+            Serial.print(this->getTopologyPath());
+            Serial.println(")");
+
             mk_setup(setup_pkt, 0x40, 0x00, 0x0000, 0x0000, 0);
             queue_Control_Transfer(dev, &setup_pkt, nullptr, this);
             init_phase = 0;

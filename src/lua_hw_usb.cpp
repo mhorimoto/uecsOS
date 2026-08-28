@@ -11,7 +11,6 @@
 
 // USBホストとハブの定義
 USBHost myusb;
-USBHub hub1(myusb);
 
 // 【変更】ドライバインスタンスを最大台数分、静的に確保する
 FT232H_MPSSE ft232h_0(myusb);
@@ -19,6 +18,12 @@ FT232H_MPSSE ft232h_1(myusb);
 FT232H_MPSSE ft232h_2(myusb);
 FT232H_MPSSE ft232h_3(myusb);
 FT232H_MPSSE ft232h_4(myusb);
+
+USBHub hub0(myusb);
+USBHub hub1(myusb);
+USBHub hub2(myusb); // カスケードされる2段目のHUB用に追加
+USBHub hub3(myusb); // 予備（7ポートHUBなどの内部カスケード対応）
+USBHub hub4(myusb); // 予備
 
 // プログラムから扱いやすいようにポインタの配列にまとめる
 FT232H_MPSSE* ft_devices[MAX_FT232H_DEVICES] = {

@@ -2,6 +2,31 @@
 #include <SD.h>
 #include <NativeEthernet.h>
 #include "USB_FT232H_MPSSE.h"
+// ============================================================
+// 【追記】Luaから呼び出される FT232H トポロジ取得用ラッパー
+// ============================================================
+static int l_ft232h_get_topology(lua_State *L) {
+    int index = luaL_checkinteger(L, 1);
+    if (index < 0 || index >= MAX_FT232H_DEVICES) {
+        lua_pushstring(L, "Disconnected");
+        return 1;
+    }
+    if (ft_devices[index] == nullptr) {
+        lua_pushstring(L, "Disconnected");
+        return 1;
+    }
+    String path = ft_devices[index]->getTopologyPath();
+    lua_pushstring(L, path.c_str());
+    return 1;
+}
+
+// ============================================================
+// 【追記】ラッパー関数のLua VMへの登録関数
+// ============================================================
+void register_lua_usb_topology(lua_State *L) {
+    lua_register(L, "ft232h_get_topology", l_ft232h_get_topology);
+}
+// ============================================================
 
 // main.cpp に残るUI関数とネットワークエンジンの外部参照
 extern void update_os_display(); 
@@ -65,6 +90,8 @@ static bool _persistent_vm_load(const char* filename) {
     g_lua_main = luaL_newstate();
     luaL_openlibs(g_lua_main);
     register_lua_functions(g_lua_main);
+    // 【追記】永続VMへUSBトポロジ取得関数を登録
+    register_lua_usb_topology(g_lua_main);
     lua_sethook(g_lua_main, lua_os_hook, LUA_MASKCOUNT, 10000);
 
     // 環境変数のセットアップ（対話実行用VMと同様）
@@ -190,6 +217,8 @@ void execute_lua_file(const char* filename) {
     lua_State *L = luaL_newstate();
     luaL_openlibs(L);
     register_lua_functions(L);
+    // 【追記】対話実行・使い捨てVMへUSBトポロジ取得関数を登録
+    register_lua_usb_topology(L);
     lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
 
     IPAddress ip = Ethernet.localIP();

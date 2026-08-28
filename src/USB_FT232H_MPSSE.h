@@ -91,9 +91,9 @@ private:
     // タイマースロット
     FT_TimedRelay _timers[FT_TIMED_RELAY_MAX];
     // システム上の全USBデバイスのトポロジ記録用マップ
-    uint8_t    topo_hub_addr[128];
-    uint8_t    topo_hub_port[128];
-
+    // 【修正】staticを追加
+    static uint8_t topo_hub_addr[128];
+    static uint8_t topo_hub_port[128];
     void init();
     void bulk_write(const uint8_t *data, uint32_t len);
 };
