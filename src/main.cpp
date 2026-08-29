@@ -1,6 +1,6 @@
 #include "system_config.h"
 #include "system_time.h"
-#include "serial_shell.h"
+#include "shell_system.h"
 #include "lua_executor.h"
 #include "system_lcd.h"
 #include "system_sd.h"
@@ -20,7 +20,7 @@
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.35" // バージョン番号
+#define VERSION "0.5.37" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -49,7 +49,6 @@ static uint32_t last_1min_ms  = 0;
 #define SCHEDULER_LUA_FILE "scheduler.lua"
 
 void setup() {
-    uint8_t current_mac[6];
     Serial.begin(115200);
     uint32_t startTime = millis();
     while (!Serial && (millis() - startTime < 5000));
@@ -70,6 +69,7 @@ void setup() {
     if (syncWithNTP()) {
         Serial.println("NTP synced.");
     }
+    Udp.begin(localPort);
     // 5. UECSプロトコルスタックの初期化
     init_network_manager(); // 16529ポート開始 ネットワークマネージャーの初期化
     init_uecs_network();    // 16520ポート開始 UECSネットワークの初期化
@@ -169,50 +169,12 @@ void loop() {
         
         if (len > 0) {
             packetBuffer[len] = '\0';
-            Serial.print("RAW UDP DATA: ");
-            for(int i=0; i<len; i++) {
-                Serial.printf("%02X ", (uint8_t)packetBuffer[i]);
-            }
-            Serial.println();
-            std::string line = packetBuffer;
-
-            // run("filename") コマンドの解析
-            if (line.substr(0, 4) == "run(") {
-                size_t first = line.find('"');
-                size_t last = line.find('"', first + 1);
-                if (first != std::string::npos && last != std::string::npos) {
-                    execute_lua_file(line.substr(first + 1, last - first - 1).c_str());
-                }
-            } else {
-                size_t dotPos = line.find_last_of('.');
-                if (dotPos != std::string::npos) { 
-                    luaBuffer += line.substr(0, dotPos);
-
-                    Serial.print("Executing Lua: [");
-                    Serial.print(luaBuffer.c_str());
-                    Serial.println("]");
-
-                    lua_State *L = luaL_newstate();
-                    luaL_openlibs(L);
-                    register_lua_functions(L);
-                    lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
-                    IPAddress ip = Ethernet.localIP();
-                    String ipStr = String(ip[0]) + "." + String(ip[1]) + "." + String(ip[2]) + "." + String(ip[3]);
-                    lua_pushstring(L, ipStr.c_str());
-                    lua_setglobal(L, "my_ip");
-
-                    if (luaL_dostring(L, luaBuffer.c_str()) != LUA_OK) {
-                        Serial.print("Lua Runtime Error: ");
-                        Serial.println(lua_tostring(L, -1));
-                    }
-
-                    lua_close(L);
-                    luaBuffer = ""; 
-                    Serial.println("--- Execution Finished ---");
-                } else {
-                    luaBuffer += line + "\n";
-                }
-            }
+            String cmd = String(packetBuffer);
+            
+            // 返信用パケットを準備して統合シェル関数へストリームを渡す
+            Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+            execute_shell_command(cmd, Udp);
+            Udp.endPacket();
         }
     }
     process_serial_shell();
