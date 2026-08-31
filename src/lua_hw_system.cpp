@@ -5,23 +5,26 @@
 #include "network_manager.h"
 #include "libuecs.h"
 
-#define LUA_HW_SYSTEM_VERSION "0.0.6"
+#define LUA_HW_SYSTEM_VERSION "0.0.7"
 extern void run_os_background_tasks();
+
+// グローバルポインタの実体定義（デフォルトはSerial）
+Print* active_lua_out = &Serial;
 
 extern "C" {
     int l_my_print(lua_State *L) {
         int nargs = lua_gettop(L);
         for (int i=1; i <= nargs; i++) {
             const char *s = lua_tostring(L, i);
-            if (s) Serial.print(s);
-            if (i < nargs) Serial.print("\t");
+            if (s) active_lua_out->print(s);
+            if (i < nargs) active_lua_out->print("\t");
         }
-        Serial.println();
+        active_lua_out->println();
         return 0;
     }
 
     int l_teensy_reset(lua_State *L) {
-        Serial.println("Reset trigger calling...");
+        active_lua_out->println("Reset trigger calling...");
         delay(100);
         SCB_AIRCR = 0x05FA0004;
         *(volatile uint32_t *)0xE000ED0C = 0x05FA0004;

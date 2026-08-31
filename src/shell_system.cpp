@@ -44,9 +44,18 @@ void execute_shell_command(String line, Print& out) {
         luaL_openlibs(L);
         register_lua_functions(L);
         lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
+        
+        // ★修正: Lua実行中は active_lua_out を確実に out に向ける
+        Print* previous_out = active_lua_out;
+        active_lua_out = &out;
+        
         if (luaL_dostring(L, full_script.c_str()) != LUA_OK) {
-            out.println(lua_tostring(L, -1)); // Serial から out へ変更
+            out.println(lua_tostring(L, -1)); 
         }
+        
+        // ★修正: 実行が終わったら必ず元のストリームに戻す
+        active_lua_out = previous_out;
+        
         lua_close(L);
         out.println("Ok");
     } else if (cmd == "LIST") {
@@ -81,12 +90,12 @@ void execute_shell_command(String line, Print& out) {
         String filename = line.substring(5);
         filename.trim();
         save_lua_program(filename.c_str());
-        out.println("Ok"); // UDP等の通信元へ完了を通知するために追加
+        out.println("Ok"); 
     } else if (cmd.startsWith("LOAD ")) {
         String filename = line.substring(5);
         filename.trim();
         load_lua_program(filename.c_str());
-        out.println("Ok"); // UDP等の通信元へ完了を通知するために追加
+        out.println("Ok"); 
     } else if (cmd == "SCHED") {
         out.print("Active scheduler: ");
         out.println(get_active_scheduler_filename());
@@ -116,11 +125,18 @@ void execute_shell_command(String line, Print& out) {
         luaL_openlibs(L);
         register_lua_functions(L);
         lua_sethook(L, lua_os_hook, LUA_MASKCOUNT, 10000);
+        
+        // ★修正: 即時実行モードも同様に保護する
+        Print* previous_out = active_lua_out;
+        active_lua_out = &out;
+        
         if (luaL_dostring(L, line.c_str()) != LUA_OK) {
             out.println(lua_tostring(L, -1));
         } else {
-            out.println("Ok"); // UDPへの正常終了通知のため追加
+            out.println("Ok"); 
         }
+        
+        active_lua_out = previous_out;
         lua_close(L);
     }
 }
@@ -138,7 +154,7 @@ void process_serial_shell() {
         } else if (c == '\n' || c == '\r') {
             if (serialBuffer.length() > 0) {
                 Serial.println();
-                execute_shell_command(serialBuffer, Serial); // Serial を Print& として渡す
+                execute_shell_command(serialBuffer, Serial); 
                 serialBuffer = "";
             }
         } else if (c >= 32 && c <= 126) {

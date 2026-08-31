@@ -1,6 +1,6 @@
 #ifndef LUA_FUNCTIONS_H
 #define LUA_FUNCTIONS_H
-#define LUA_FUNCTIONS_H_VERSION "0.0.2"
+#define LUA_FUNCTIONS_H_VERSION "0.0.3"
 
 #include <Arduino.h>
 #include <SD.h>
@@ -51,7 +51,8 @@ extern "C" {
 extern LiquidCrystal_I2C lcd;
 extern USBHost myusb;
 extern USBSerial_BigBuffer userial;
-
+// Luaの標準出力先を動的に切り替えるためのグローバルポインタ
+extern Print* active_lua_out;
 
 // 関数登録用メイン関数
 void register_lua_functions(lua_State *L);
