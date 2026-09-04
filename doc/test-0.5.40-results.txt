@@ -1,0 +1,31 @@
+BLD: 0.5.40のテスト結果
+
+dofile("config.lua"); dofile("device_manager.lua"); init_devices()
+=== USB Topology Binding ===
+[Map] RELAY_BOX_A  (Slot 0) <= Root-Hub(1)-1
+[Map] RELAY_BOX_B  (Slot 1) <= Root-Hub(1)-4-1
+============================
+Ok
+dofile("config.lua"); dofile("device_manager.lua"); init_devices(); relay_set("RELAY_BOX_A", "d0", true)
+=== USB Topology Binding ===
+[Map] RELAY_BOX_A  (Slot 0) <= Root-Hub(1)-1
+[Map] RELAY_BOX_B  (Slot 1) <= Root-Hub(1)-4-1
+============================
+Ok
+点灯
+
+dofile("config.lua"); dofile("device_manager.lua"); init_devices(); relay_set("RELAY_BOX_A", "d0", false)
+=== USB Topology Binding ===
+[Map] RELAY_BOX_A  (Slot 0) <= Root-Hub(1)-1
+[Map] RELAY_BOX_B  (Slot 1) <= Root-Hub(1)-4-1
+============================
+Ok
+消灯
+
+dofile("config.lua"); dofile("device_manager.lua"); init_devices(); relay_pulse("RELAY_BOX_B", "d7", 2000)
+=== USB Topology Binding ===
+[Map] RELAY_BOX_A  (Slot 0) <= Root-Hub(1)-1
+[Map] RELAY_BOX_B  (Slot 1) <= Root-Hub(1)-4-1
+============================
+Ok
+点滅

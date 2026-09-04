@@ -12,6 +12,38 @@ extern void run_os_background_tasks();
 Print* active_lua_out = &Serial;
 
 extern "C" {
+    // SDカード対応のカスタムdofile
+    int l_my_dofile(lua_State *L) {
+        const char *filename = luaL_checkstring(L, 1);
+        char path[64];
+        if (filename[0] != '/') {
+            snprintf(path, sizeof(path), "/%s", filename);
+        } else {
+            strncpy(path, filename, sizeof(path));
+            path[sizeof(path) - 1] = '\0';
+        }
+
+        if (!SD.exists(path)) {
+            return luaL_error(L, "cannot open %s: No such file on SD", filename);
+        }
+
+        File f = SD.open(path, FILE_READ);
+        if (!f) {
+            return luaL_error(L, "failed to open %s", filename);
+        }
+
+        String script = "";
+        while (f.available()) {
+            script += (char)f.read();
+        }
+        f.close();
+
+        // 現在のVMインスタンス上で直接評価・実行する
+        if (luaL_dostring(L, script.c_str()) != LUA_OK) {
+            return lua_error(L); // スクリプト内の文法・実行時エラーをそのまま上位へ伝播
+        }
+        return 0;
+    }
     int l_my_print(lua_State *L) {
         int nargs = lua_gettop(L);
         for (int i=1; i <= nargs; i++) {

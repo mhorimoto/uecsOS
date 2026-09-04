@@ -35,6 +35,7 @@ void register_lua_functions(lua_State *L) {
     };
     // System
     reg_glob("print", l_my_print);
+    reg_glob("dofile", l_my_dofile); // 標準dofileをSD対応関数へ差し替え
     reg_glob("reset", l_teensy_reset);
     reg_glob("digitalWrite", l_digitalWrite);
     reg_glob("digitalRead", l_digitalRead);

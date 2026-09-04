@@ -21,6 +21,7 @@ extern "C" {
     // 各カテゴリのプロトタイプ宣言
     // System系
     int l_my_print(lua_State *L);
+    int l_my_dofile(lua_State *L); // SD対応dofile
     int l_teensy_reset(lua_State *L);
     int l_digitalWrite(lua_State *L);
     int l_digitalRead(lua_State *L);
