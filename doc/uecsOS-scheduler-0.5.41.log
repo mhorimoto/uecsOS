@@ -1,0 +1,140 @@
+[2026-09-09 01:24:13] uecsOS Starting ... BLD: 0.5.41
+[2026-09-09 01:24:13] SD Card initialized.
+[2026-09-09 01:24:13] Config: EEPROM is up-to-date (SEQ: 1).
+[2026-09-09 01:24:13] Add **SDClass** file system
+[2026-09-09 01:24:13] MTP Initialized.
+[2026-09-09 01:24:13] Network: Using NXP Hardware MAC (UAA): 04:E9:E5:19:15:3B
+[2026-09-09 01:24:13] Attempting DHCP...
+[2026-09-09 01:24:20] IP Address: 192.168.38.105
+[2026-09-09 01:24:20] NTP synced.
+[2026-09-09 01:24:20] Network: NODESCAN engine started on port 16529.
+[2026-09-09 01:24:20] UECS: CCM engine started on port 16520.
+[2026-09-09 01:24:20] --- System Ready ---
+[2026-09-09 01:24:20] &&&&& Dump MTPStorage Loop Data &&&&&
+[2026-09-09 01:24:20] 	Callback Data:		0	0x0	0
+[2026-09-09 01:24:20] 		1	0x0	0
+[2026-09-09 01:24:20] 		2	0x0	0
+[2026-09-09 01:24:20] 		3	0x0	0
+[2026-09-09 01:24:20] 		4	0x0	0
+[2026-09-09 01:24:20] 	File Systems:
+[2026-09-09 01:24:20] 		0	0x20015f30	1
+[2026-09-09 01:24:20] USB Initializing...
+[2026-09-09 01:24:20] USB Powering up... Waiting for bus enumeration...
+[2026-09-09 01:24:21] [FT232H] Interface claimed. Starting MPSSE config... (Disconnected)
+[2026-09-09 01:24:21] [FT232H] MPSSE Init complete! Device ready.
+[2026-09-09 01:24:21] [FT232H] Interface claimed. Starting MPSSE config... (Disconnected)
+[2026-09-09 01:24:21] [FT232H] MPSSE Init complete! Device ready.
+[2026-09-09 01:24:22] Loading configurations...
+[2026-09-09 01:24:22] === USB Topology Binding ===
+[2026-09-09 01:24:22] [Map] RELAY_BOX_A  (Slot 0) <= Root-Hub(1)-1
+[2026-09-09 01:24:22] [Map] RELAY_BOX_B  (Slot 1) <= Root-Hub(1)-4-1
+[2026-09-09 01:24:22] ============================
+[2026-09-09 01:24:22] === System Startup Sequence Completed ===
+[2026-09-09 01:24:22] [Scheduler] Initializing persistent environment...
+[2026-09-09 01:24:22] === USB Topology Binding ===
+[2026-09-09 01:24:22] [Map] RELAY_BOX_A  (Slot 0) <= Root-Hub(1)-1
+[2026-09-09 01:24:22] [Map] RELAY_BOX_B  (Slot 1) <= Root-Hub(1)-4-1
+[2026-09-09 01:24:22] ============================
+[2026-09-09 01:24:22] [Scheduler] Initialization completed successfully.
+[2026-09-09 01:24:22] [Lua Persistent] Scheduler loaded: scheduler.lua
+[2026-09-09 01:24:27] [Scheduler:1s #5] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:24:32] [Scheduler:1s #10] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:24:32] [Scheduler:10s #1] Running autonomous environmental loop
+[2026-09-09 01:24:37] [Scheduler:1s #15] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:24:42] [Scheduler:1s #20] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:24:42] [Scheduler:10s #2] Running autonomous environmental loop
+[2026-09-09 01:24:47] [Scheduler:1s #25] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:24:52] [Scheduler:1s #30] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:24:52] [Scheduler:10s #3] Running autonomous environmental loop
+[2026-09-09 01:24:57] [Scheduler:1s #35] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:02] [Scheduler:1s #40] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:02] [Scheduler:10s #4] Running autonomous environmental loop
+[2026-09-09 01:25:07] [Scheduler:1s #45] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:12] [Scheduler:1s #50] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:12] [Scheduler:10s #5] Running autonomous environmental loop
+[2026-09-09 01:25:17] [Scheduler:1s #55] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:22] [Scheduler:1s #60] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:22] [Scheduler:10s #6] Running autonomous environmental loop
+[2026-09-09 01:25:22] [Scheduler:1min] Periodic report:
+[2026-09-09 01:25:22]   Uptime: 71 sec
+[2026-09-09 01:25:22]   Lua Memory: 35123 bytes
+[2026-09-09 01:25:27] [Scheduler:1s #65] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:32] [Scheduler:1s #70] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:32] [Scheduler:10s #7] Running autonomous environmental loop
+[2026-09-09 01:25:37] [Scheduler:1s #75] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:42] [Scheduler:1s #80] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:42] [Scheduler:10s #8] Running autonomous environmental loop
+[2026-09-09 01:25:47] [Scheduler:1s #85] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:52] [Scheduler:1s #90] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:25:52] [Scheduler:10s #9] Running autonomous environmental loop
+[2026-09-09 01:25:57] [Scheduler:1s #95] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:02] [Scheduler:1s #100] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:02] [Scheduler:10s #10] Running autonomous environmental loop
+[2026-09-09 01:26:07] [Scheduler:1s #105] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:12] [Scheduler:1s #110] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:12] [Scheduler:10s #11] Running autonomous environmental loop
+[2026-09-09 01:26:17] [Scheduler:1s #115] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:22] [Scheduler:1s #120] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:22] [Scheduler:10s #12] Running autonomous environmental loop
+[2026-09-09 01:26:22] [Scheduler:1min] Periodic report:
+[2026-09-09 01:26:22]   Uptime: 131 sec
+[2026-09-09 01:26:22]   Lua Memory: 36575 bytes
+[2026-09-09 01:26:27] [Scheduler:1s #125] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:32] [Scheduler:1s #130] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:32] [Scheduler:10s #13] Running autonomous environmental loop
+[2026-09-09 01:26:37] [Scheduler:1s #135] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:42] [Scheduler:1s #140] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:42] [Scheduler:10s #14] Running autonomous environmental loop
+[2026-09-09 01:26:47] [Scheduler:1s #145] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:52] [Scheduler:1s #150] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:26:52] [Scheduler:10s #15] Running autonomous environmental loop
+[2026-09-09 01:26:57] [Scheduler:1s #155] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:02] [Scheduler:1s #160] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:02] [Scheduler:10s #16] Running autonomous environmental loop
+[2026-09-09 01:27:07] [Scheduler:1s #165] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:12] [Scheduler:1s #170] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:12] [Scheduler:10s #17] Running autonomous environmental loop
+[2026-09-09 01:27:17] [Scheduler:1s #175] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:22] [Scheduler:1s #180] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:22] [Scheduler:10s #18] Running autonomous environmental loop
+[2026-09-09 01:27:22] [Scheduler:1min] Periodic report:
+[2026-09-09 01:27:22]   Uptime: 191 sec
+[2026-09-09 01:27:22]   Lua Memory: 38037 bytes
+[2026-09-09 01:27:27] [Scheduler:1s #185] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:32] [Scheduler:1s #190] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:32] [Scheduler:10s #19] Running autonomous environmental loop
+[2026-09-09 01:27:37] [Scheduler:1s #195] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:42] [Scheduler:1s #200] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:42] [Scheduler:10s #20] Running autonomous environmental loop
+[2026-09-09 01:27:47] [Scheduler:1s #205] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:52] [Scheduler:1s #210] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:27:52] [Scheduler:10s #21] Running autonomous environmental loop
+[2026-09-09 01:27:57] [Scheduler:1s #215] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:02] [Scheduler:1s #220] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:02] [Scheduler:10s #22] Running autonomous environmental loop
+[2026-09-09 01:28:07] [Scheduler:1s #225] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:12] [Scheduler:1s #230] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:12] [Scheduler:10s #23] Running autonomous environmental loop
+[2026-09-09 01:28:17] [Scheduler:1s #235] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:22] [Scheduler:1s #240] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:22] [Scheduler:10s #24] Running autonomous environmental loop
+[2026-09-09 01:28:22] [Scheduler:1min] Periodic report:
+[2026-09-09 01:28:22]   Uptime: 251 sec
+[2026-09-09 01:28:22]   Lua Memory: 39499 bytes
+[2026-09-09 01:28:27] [Scheduler:1s #245] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:32] [Scheduler:1s #250] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:32] [Scheduler:10s #25] Running autonomous environmental loop
+[2026-09-09 01:28:37] [Scheduler:1s #255] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:42] [Scheduler:1s #260] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:42] [Scheduler:10s #26] Running autonomous environmental loop
+[2026-09-09 01:28:47] [Scheduler:1s #265] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:52] [Scheduler:1s #270] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:52] [Scheduler:10s #27] Running autonomous environmental loop
+[2026-09-09 01:28:57] [Scheduler:1s #275] Pulsing RELAY_BOX_A d0 for 500ms
+[2026-09-09 01:28:58] [Lua Persistent] Stopped.
+
+$ socat - UDP4-DATAGRAM:192.168.38.105:8888
+--これで
+sched stop
+Ok - all relays forced OFF
+
