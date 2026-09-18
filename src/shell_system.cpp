@@ -146,6 +146,15 @@ void process_serial_shell() {
     static String serialBuffer = "";
     if (Serial.available() > 0) {
         char c = Serial.read();
+        // Ctrl+C (ASCII 3) を検知した場合にスケジューラを強制停止
+        if (c == 3) {
+            stop_persistent_lua();
+            Serial.println("\n[OS] Scheduler Stopped by Ctrl+C.");
+            // 入力バッファをクリアしてプロンプトへ復帰
+            // (例: serialBuffer = ""; や buffer.clear(); など)
+            serialBuffer = "";
+            return;
+        }
         if (c == '\b' || c == 127) {
             if (serialBuffer.length() > 0) {
                 serialBuffer.remove(serialBuffer.length() - 1);
