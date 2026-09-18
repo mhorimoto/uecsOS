@@ -158,14 +158,25 @@ bool FT232H_MPSSE::pinPulse(char port, uint8_t bit, uint32_t duration_ms) {
 //   （約49日周期のオーバーフローでも正しく動作する）
 // ============================================================
 void FT232H_MPSSE::processTimers() {
+    if (!device_ready) return;
     uint32_t now = millis();
+
     for (int i = 0; i < FT_TIMED_RELAY_MAX; i++) {
         if (!_timers[i].active) continue;
+
+        // 符号付き32bit差分比較により、millis()が約49日で0周しても安全に期限判定
         if ((int32_t)(now - _timers[i].off_at_ms) >= 0) {
-            // 期限切れ → OFFにする
-            if (_timers[i].port == 'd') writeADBUSBit(_timers[i].bit, false);
-            else                        writeACBUSBit(_timers[i].bit, false);
+            // 期限切れ → リレー接点を開放（OFF / 非アクティブ）
+            if (_timers[i].port == 'd') {
+                writeADBUSBit(_timers[i].bit, false);
+            } else {
+                writeACBUSBit(_timers[i].bit, false);
+            }
             _timers[i].active = false;
+
+            // 【追加】物理遮断（OFF）ログをシリアルへ出力
+            Serial.printf("[Relay Log] %s Pin %c%d -> OFF (Auto-Pulse Expired)\n",
+                          getTopologyPath().c_str(), _timers[i].port, _timers[i].bit);
         }
     }
 }
