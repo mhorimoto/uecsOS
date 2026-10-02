@@ -14,13 +14,14 @@
 #include "lua_functions.h"
 #include "libuecs.h"
 #include "USB_FT232H_MPSSE.h"
+#include "ili9488_lcd.h"
 #include <MTP_Teensy.h>
 
 #define LC_SEQ          0x70 // 4 bytes (unsigned long)
 #define EEPROM_CONFIG_SIZE 0x80 // 更新対象の全サイズ
 
 // --- 設定 ---
-#define VERSION "0.5.44" // バージョン番号
+#define VERSION "0.5.45" // バージョン番号
 
 bool os_booted = false;   // OS起動完了フラグ
 
@@ -48,6 +49,23 @@ static uint32_t last_1min_ms  = 0;
 // 永続VMが読み込むスケジューラ用Luaファイル
 #define SCHEDULER_LUA_FILE "scheduler.lua"
 
+// 8ビットパラレルバスの初期化 (DC, CS, WR, RD, D0, D1, D2, D3, D4, D5, D6, D7)
+Arduino_DataBus *bus = new Arduino_SWPAR8(
+  TFT_DC, TFT_CS, TFT_WR, GFX_NOT_DEFINED /* RDなし */,
+  TFT_D0, TFT_D1, TFT_D2, TFT_D3, TFT_D4, TFT_D5, TFT_D6, TFT_D7
+);
+
+// ILI9488 ディスプレイオブジェクト
+// (引数: bus, rst_pin, rotation[0-3], ips)
+//Arduino_GFX *gfx = new Arduino_ILI9488_18bit(bus, TFT_RST, 1 /* 横向き表示 */, false);
+// ST7796 を試す
+//Arduino_GFX *gfx = new Arduino_ST7796(bus, TFT_RST, 1 /* rotation */, false);
+// ILI9486 を試す
+//Arduino_GFX *gfx = new Arduino_ILI9486(bus, TFT_RST, 1 /* rotation */, false);
+// HX8357A を試す
+Arduino_GFX *gfx = new Arduino_HX8357A(bus, TFT_RST, 1 /* rotation */, false);
+// HX8357B を試す
+//Arduino_GFX *gfx = new Arduino_HX8357B(bus, TFT_RST, 1 /* rotation */, false);
 void setup() {
     Serial.begin(115200);
     uint32_t startTime = millis();
@@ -56,6 +74,26 @@ void setup() {
     // 1. UI(LCD)初期化
     init_system_lcd(VERSION);
     Serial.println("uecsOS Starting ... BLD: " VERSION);
+    // iLI9488 LCDの初期化
+    if (!gfx->begin()) {
+        Serial.println("ILI9488 begin() 失敗");
+    } else {
+        Serial.println("ILI9488 begin() 成功");
+    }
+
+    // テスト描画
+    gfx->fillScreen(RGB565_BLACK);
+    gfx->setTextColor(RGB565_YELLOW);
+    gfx->setTextSize(3);
+    gfx->setCursor(20, 30);
+    gfx->println("Teensy 4.1");
+
+    gfx->setTextColor(RGB565_GREEN);
+    gfx->setTextSize(2);
+    gfx->setCursor(20, 80);
+    gfx->println("ILI9488 8-bit Parallel");
+    gfx->drawRect(15, 20, 450, 100, RGB565_CYAN);
+
     // 2. ストレージ(SDカードとEEPROM設定)初期化
     init_system_sd();
     // MTPの初期化 (必ずSDカード初期化の直後に呼ぶ)
