@@ -7,7 +7,7 @@
 #include <NativeEthernetUdp.h>
 #include <EEPROM.h>
 
-#define LIBUECS_VERSION "0.0.9"
+#define LIBUECS_VERSION "0.1.1"
 
 extern "C" {
     #include "lua.h"
@@ -36,7 +36,12 @@ bool set_uecs_slot_internal(char p_type, const char* p_ccmtype, uint8_t room, ui
         target_slot = 0;
     } else {
         for (int i = 1; i < MAX_UECS_SLOTS; i++) {
-            if (uecs_slots[i].active && uecs_slots[i].type == p_type && uecs_slots[i].room == room && uecs_slots[i].region == region && strcmp(uecs_slots[i].ccmtype, p_ccmtype) == 0) {
+            if (uecs_slots[i].active && 
+                uecs_slots[i].type == p_type && 
+                uecs_slots[i].room == room && 
+                uecs_slots[i].region == region && 
+                uecs_slots[i].order == order && 
+                strcmp(uecs_slots[i].ccmtype, p_ccmtype) == 0) {
                 target_slot = i; break;
             }
         }
@@ -158,6 +163,9 @@ void process_incoming_uecs() {
             p = strstr(data_tag, "region=\"");
             if (p) region = atoi(p + 8);
 
+            p = strstr(data_tag, "order=\"");
+            if (p) order = atoi(p + 7);
+
             // 値の抽出 (タグの終端 '>' の次)
             const char* tag_end = strchr(data_tag, '>');
             if (tag_end) value = atof(tag_end + 1);
@@ -165,13 +173,18 @@ void process_incoming_uecs() {
             // Rスロットと照合して更新
             for (int i = 0; i < MAX_UECS_SLOTS; i++) {
                 if (!uecs_slots[i].active || uecs_slots[i].type != 'R') continue;
-                if (uecs_slots[i].room == room && uecs_slots[i].region == region && strcmp(uecs_slots[i].ccmtype, ccmtype) == 0) {
-                    
+
+                // room, region, order の一致確認（スロット側が0の場合はワイルドカード）
+                bool room_match   = (uecs_slots[i].room == 0   || uecs_slots[i].room == room);
+                bool region_match = (uecs_slots[i].region == 0 || uecs_slots[i].region == region);
+                bool order_match  = (uecs_slots[i].order == 0  || uecs_slots[i].order == order);
+
+                if (room_match && region_match && order_match && strcmp(uecs_slots[i].ccmtype, ccmtype) == 0) {
                     uecs_slots[i].value = value;
                     uecs_slots[i].last_update_ms = millis();
                     uecs_slots[i].valid = true;
-                    
-                    Serial.printf("UECS: [Recv] Slot %d (%s r:%d g:%d) = %.2f\n", i, ccmtype, room, region, value);
+
+                    Serial.printf("UECS: [Recv] Slot %d (%s r:%d g:%d o:%d) = %.2f\n", i, ccmtype, room, region, order, value);
                     break; 
                 }
             }
@@ -302,23 +315,53 @@ int l_uecs_list(lua_State *L) {
 
 
 // --- Luaからスロットの値を読み出す関数 ---
+// 引数: ccmtype(str), room(opt:0), region(opt:0), order(opt:0:ワイルドカード)
+// 戻り値: 
+//   成功時: value(number), true
+//   該当なし/無効時: nil, false
 int l_uecs_get(lua_State *L) {
     const char* ccmtype = luaL_checkstring(L, 1);
-    uint8_t room        = (uint8_t)luaL_optinteger(L, 2, 1); 
-    uint8_t region      = (uint8_t)luaL_optinteger(L, 3, 1); 
+    uint8_t room        = (uint8_t)luaL_optinteger(L, 2, 0); 
+    uint8_t region      = (uint8_t)luaL_optinteger(L, 3, 0); 
+    uint16_t order      = (uint16_t)luaL_optinteger(L, 4, 0); // 省略時0（ワイルドカード）
+
+    int best_index = -1;
+    uint8_t highest_priority = 255; // UECSのpriorityは小さいほど高優先度（初期値は最低）
 
     for (int i = 0; i < MAX_UECS_SLOTS; i++) {
+        // アクティブかつ、有効期限内（valid == true）であり、
+        // ccmtype, room, region が一致しているスロットのみを対象とする
         if (uecs_slots[i].active && 
+            uecs_slots[i].valid && 
             uecs_slots[i].room == room && 
             uecs_slots[i].region == region && 
             strcmp(uecs_slots[i].ccmtype, ccmtype) == 0) {
             
-            lua_pushnumber(L, uecs_slots[i].value);
-            lua_pushboolean(L, uecs_slots[i].valid);
-            return 2; 
+            // 1. order 指定がある場合（order > 0）: 完全一致で確定
+            if (order > 0) {
+                if (uecs_slots[i].order == order) {
+                    best_index = i;
+                    break; // 指定号機の有効な値が見つかったので即探索終了
+                }
+            } 
+            // 2. order = 0（ワイルドカード）の場合: 有効なものの中で最もpriorityが小さいものを選択
+            else {
+                if (uecs_slots[i].priority < highest_priority) {
+                    highest_priority = uecs_slots[i].priority;
+                    best_index = i;
+                }
+            }
         }
     }
+    // 有効なスロットが見つかった場合
+    if (best_index != -1) {
+        lua_pushnumber(L, uecs_slots[best_index].value);
+        lua_pushboolean(L, true);
+        return 2;
+    }
+    // 該当する有効なスロットが存在しない（未受信、または寿命切れ）場合
     lua_pushnil(L);
+    lua_pushboolean(L, false);
     return 2;
 }
 
